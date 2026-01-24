@@ -1,0 +1,68 @@
+# ============================================================================
+# requirements.txt (RACINE DU PROJET)
+# ============================================================================
+# Installation: pip install -r requirements.txt
+# ============================================================================
+
+# Base de données
+mysql-connector-python==8.2.0
+
+# Data science & ML
+pandas==2.1.4
+numpy==1.26.2
+scikit-learn==1.3.2
+
+# Visualisation
+matplotlib==3.8.2
+seaborn==0.13.0
+
+# Génération de rapports
+reportlab==4.0.7
+Pillow==10.1.0
+
+# API & Web (pour dashboard)
+flask==3.0.0
+flask-cors==4.0.0
+
+# ML Avancé pour maintenance prédictive
+xgboost==2.0.3
+shap==0.44.0
+imbalanced-learn==0.11.0
+lightgbm==4.1.0
+
+# Deep Learning (optionnel pour LSTM)
+# tensorflow==2.15.0  # Décommenter si besoin de LSTM
+
+
+# ============================================================================
+# dashboard/requirements.txt (DASHBOARD SPÉCIFIQUE)
+# ============================================================================
+# Installation: cd dashboard && pip install -r requirements.txt
+# ============================================================================
+
+flask==3.0.0
+flask-cors==4.0.0
+mysql-connector-python==8.2.0
+pandas==2.1.4
+numpy==1.26.2
+
+
+# ============================================================================
+# INSTRUCTIONS D'INSTALLATION
+# ============================================================================
+#
+# 1. Créer un environnement virtuel:
+#    python -m venv venv
+#
+# 2. Activer l'environnement:
+#    Windows: venv\Scripts\activate
+#    Linux/Mac: source venv/bin/activate
+#
+# 3. Installer les dépendances:
+#    pip install -r requirements.txt
+#
+# 4. Pour le dashboard spécifiquement:
+#    cd dashboard
+#    pip install -r requirements.txt
+#
+# ============================================================================

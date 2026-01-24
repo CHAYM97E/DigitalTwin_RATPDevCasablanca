@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Twin - RATP Dev Casablanca</title>
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <!-- Three.js pour la 3D -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- Chart.js pour les graphiques -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: white;
+            overflow-x: hidden;
+        }
+        
+        /* Header */
+        .header {
+            background: rgba(15, 23, 42, 0.95);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #FF6B35;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+        
+        .header h1 {
+            font-size: 1.8rem;
+            background: linear-gradient(135deg, #FF6B35, #FFD93D);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .nav-buttons {
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .nav-btn {
+            padding: 0.7rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            background: #334155;
+            color: white;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+        
+        .nav-btn:hover {
+            background: #FF6B35;
+            transform: translateY(-2px);
+        }
+        
+        .nav-btn.active {
+            background: #FF6B35;
+            box-shadow: 0 4px 15px rgba(255, 107, 53, 0.4);
+        }
+        
+        /* Container principal */
+        .container {
+            display: none;
+            padding: 2rem;
+            animation: fadeIn 0.5s;
+        }
+        
+        .container.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* KPI Cards */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .kpi-card {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border-left: 4px solid #FF6B35;
+            transition: transform 0.3s;
+        }
+        
+        .kpi-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        
+        .kpi-label {
+            font-size: 0.9rem;
+            color: #94a3b8;
+            margin-bottom: 0.5rem;
+        }
+        
+        .kpi-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #FF6B35;
+        }
+        
+        /* Canvas 3D */
+        #canvas3d {
+            width: 100%;
+            height: 600px;
+            border-radius: 12px;
+            background: #0f172a;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        }
+        
+        /* Charts */
+        .chart-container {
+            background: #1e293b;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+        }
+        
+        .chart-title {
+            font-size: 1.3rem;
+            margin-bottom: 1rem;
+            color: #FFD93D;
+        }
+        
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #1e293b;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        
+        th {
+            background: #334155;
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid #334155;
+        }
+        
+        tr:hover {
+            background: #2d3748;
+        }
+        
+        .status-ok {
+            color: #10b981;
+        }
+        
+        .status-warning {
+            color: #f59e0b;
+        }
+        
+        .status-critical {
+            color: #ef4444;
+        }
+        
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            font-size: 1.2rem;
+            color: #94a3b8;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1>🚊 Digital Twin - RATP Dev Casablanca</h1>
+        <div class="nav-buttons">
+            <button class="nav-btn active" onclick="showView('overview')">Vue d'ensemble</button>
+            <button class="nav-btn" onclick="showView('3d')">Visualisation 3D</button>
+            <button class="nav-btn" onclick="showView('analytics')">Analytics ML</button>
+            <button class="nav-btn" onclick="showView('maintenance')">Maintenance</button>
+        </div>
+    </div>
+    
+    <!-- Vue d'ensemble -->
+    <div id="overview" class="container active">
+        <h2 style="margin-bottom: 2rem;">📊 Tableau de bord en temps réel</h2>
+        
+        <!-- KPIs -->
+        <div class="kpi-grid" id="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-label">Tramways actifs</div>
+                <div class="kpi-value" id="kpi-trams">--</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Retard moyen</div>
+                <div class="kpi-value" id="kpi-delay">--</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Passagers totaux</div>
+                <div class="kpi-value" id="kpi-passengers">--</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Incidents</div>
+                <div class="kpi-value" id="kpi-incidents">--</div>
+            </div>
+        </div>
+        
+        <!-- Graphiques -->
+        <div class="chart-container">
+            <div class="chart-title">Retards par heure</div>
+            <canvas id="delayChart"></canvas>
+        </div>
+        
+        <div class="chart-container">
+            <div class="chart-title">Affluence par ligne</div>
+            <canvas id="lineChart"></canvas>
+        </div>
+    </div>
+    
+    <!-- Vue 3D -->
+    <div id="3d" class="container">
+        <h2 style="margin-bottom: 2rem;">🎮 Visualisation 3D du réseau</h2>
+        <div id="canvas3d"></div>
+        <div style="margin-top: 1rem; text-align: center; color: #94a3b8;">
+            Utilisez la souris pour naviguer dans la scène 3D
+        </div>
+    </div>
+    
+    <!-- Analytics ML -->
+    <div id="analytics" class="container">
+        <h2 style="margin-bottom: 2rem;">🧠 Analytics & Machine Learning</h2>
+        
+        <div class="chart-container">
+            <div class="chart-title">Prédictions des retards (RandomForest)</div>
+            <canvas id="predictionChart"></canvas>
+        </div>
+        
+        <div class="chart-container">
+            <div class="chart-title">Performance du modèle</div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; margin-top: 1rem;">
+                <div style="text-align: center;">
+                    <div style="font-size: 3rem; color: #10b981;">0.87</div>
+                    <div style="color: #94a3b8;">R² Score</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 3rem; color: #3b82f6;">0.82 min</div>
+                    <div style="color: #94a3b8;">MAE</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 3rem; color: #a78bfa;">92%</div>
+                    <div style="color: #94a3b8;">Précision Maintenance</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Maintenance -->
+    <div id="maintenance" class="container">
+        <h2 style="margin-bottom: 2rem;">🔧 Alertes de maintenance</h2>
+        
+        <table id="maintenanceTable">
+            <thead>
+                <tr>
+                    <th>Tramway</th>
+                    <th>Composant</th>
+                    <th>Température (°C)</th>
+                    <th>Vibration</th>
+                    <th>État</th>
+                </tr>
+            </thead>
+            <tbody id="maintenanceBody">
+                <tr>
+                    <td colspan="5" class="loading">Chargement des données...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <script>
+        // ============================================================================
+        // GESTION DES VUES
+        // ============================================================================
+        
+        function showView(view) {
+            // Masquer toutes les vues
+            document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            
+            // Afficher la vue sélectionnée
+            document.getElementById(view).classList.add('active');
+            event.target.classList.add('active');
+            
+            // Initialiser selon la vue
+            if (view === '3d') {
+                init3D();
+            } else if (view === 'analytics') {
+                loadPredictions();
+            } else if (view === 'maintenance') {
+                loadMaintenance();
+            }
+        }
+        
+        // ============================================================================
+        // CHARGEMENT DES DONNÉES
+        // ============================================================================
+        
+        async function loadKPIs() {
+            try {
+                const response = await fetch('/api/analytics/global');
+                const data = await response.json();
+                
+                document.getElementById('kpi-trams').textContent = data.global.active_trams;
+                document.getElementById('kpi-delay').textContent = data.global.avg_delay.toFixed(1) + ' min';
+                document.getElementById('kpi-passengers').textContent = data.global.total_passengers.toLocaleString();
+                document.getElementById('kpi-incidents').textContent = data.global.total_incidents;
+                
+                // Graphiques
+                createDelayChart(data.by_hour);
+                createLineChart(data.by_line);
+            } catch (error) {
+                console.error('Erreur chargement KPIs:', error);
+            }
+        }
+        
+        function createDelayChart(data) {
+            const ctx = document.getElementById('delayChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => d.hour + 'h'),
+                    datasets: [{
+                        label: 'Retard moyen (min)',
+                        data: data.map(d => d.avg_delay),
+                        borderColor: '#FF6B35',
+                        backgroundColor: 'rgba(255, 107, 53, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { labels: { color: 'white' } }
+                    },
+                    scales: {
+                        y: { ticks: { color: 'white' }, grid: { color: '#334155' } },
+                        x: { ticks: { color: 'white' }, grid: { color: '#334155' } }
+                    }
+                }
+            });
+        }
+        
+        function createLineChart(data) {
+            const ctx = document.getElementById('lineChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => 'Ligne ' + d.line),
+                    datasets: [{
+                        label: 'Passagers moyens',
+                        data: data.map(d => d.avg_passengers),
+                        backgroundColor: ['#FF6B35', '#FFD93D', '#A78BFA', '#60A5FA']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { labels: { color: 'white' } }
+                    },
+                    scales: {
+                        y: { ticks: { color: 'white' }, grid: { color: '#334155' } },
+                        x: { ticks: { color: 'white' }, grid: { color: '#334155' } }
+                    }
+                }
+            });
+        }
+        
+        async function loadPredictions() {
+            try {
+                const response = await fetch('/api/predictions/delays');
+                const data = await response.json();
+                
+                const ctx = document.getElementById('predictionChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.predictions.map(p => p.hour),
+                        datasets: [{
+                            label: 'Retard prédit (min)',
+                            data: data.predictions.map(p => p.predicted_delay),
+                            borderColor: '#A78BFA',
+                            backgroundColor: 'rgba(167, 139, 250, 0.1)',
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { labels: { color: 'white' } }
+                        },
+                        scales: {
+                            y: { ticks: { color: 'white' }, grid: { color: '#334155' } },
+                            x: { ticks: { color: 'white' }, grid: { color: '#334155' } }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Erreur prédictions:', error);
+            }
+        }
+        
+        async function loadMaintenance() {
+            try {
+                const response = await fetch('/api/maintenance/alerts');
+                const data = await response.json();
+                
+                const tbody = document.getElementById('maintenanceBody');
+                tbody.innerHTML = '';
+                
+                data.alerts.forEach(alert => {
+                    const row = tbody.insertRow();
+                    row.innerHTML = `
+                        <td>${alert.tram_id}</td>
+                        <td>${alert.component}</td>
+                        <td class="${alert.temperature > 75 ? 'status-critical' : 'status-warning'}">
+                            ${alert.temperature.toFixed(1)}°C
+                        </td>
+                        <td class="${alert.vibration > 5.5 ? 'status-critical' : 'status-ok'}">
+                            ${alert.vibration.toFixed(2)}
+                        </td>
+                        <td class="${alert.failure ? 'status-critical' : 'status-warning'}">
+                            ${alert.failure ? '🔴 Panne' : '🟡 Risque'}
+                        </td>
+                    `;
+                });
+            } catch (error) {
+                console.error('Erreur maintenance:', error);
+            }
+        }
+        
+        // ============================================================================
+        // VISUALISATION 3D (SIMPLIFIÉE)
+        // ============================================================================
+        
+        function init3D() {
+            const container = document.getElementById('canvas3d');
+            if (container.children.length > 0) return; // Déjà initialisé
+            
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0f172a);
+            
+            const camera = new THREE.PerspectiveCamera(75, container.clientWidth / 600, 0.1, 1000);
+            camera.position.set(50, 40, 50);
+            
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, 600);
+            container.appendChild(renderer.domElement);
+            
+            // Lumières
+            const light = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(light);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(50, 50, 50);
+            scene.add(dirLight);
+            
+            // Sol
+            const groundGeometry = new THREE.PlaneGeometry(200, 200);
+            const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x1e293b });
+            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+            ground.rotation.x = -Math.PI / 2;
+            scene.add(ground);
+            
+            // Grille
+            const gridHelper = new THREE.GridHelper(200, 50, 0x334155, 0x1e293b);
+            scene.add(gridHelper);
+            
+            // Créer quelques tramways
+            for (let i = 0; i < 5; i++) {
+                const tramGeometry = new THREE.BoxGeometry(2, 1.5, 4);
+                const tramMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0xFF6B35,
+                    metalness: 0.7,
+                    roughness: 0.3
+                });
+                const tram = new THREE.Mesh(tramGeometry, tramMaterial);
+                tram.position.set(
+                    Math.random() * 40 - 20,
+                    0.75,
+                    Math.random() * 40 - 20
+                );
+                scene.add(tram);
+            }
+            
+            camera.lookAt(0, 0, 0);
+            
+            // Animation
+            function animate() {
+                requestAnimationFrame(animate);
+                scene.rotation.y += 0.001;
+                renderer.render(scene, camera);
+            }
+            animate();
+        }
+        
+        // ============================================================================
+        // INITIALISATION
+        // ============================================================================
+        
+        loadKPIs();
+        setInterval(loadKPIs, 10000); // Rafraîchir toutes les 10s
+    </script>
+</body>
+</html>
