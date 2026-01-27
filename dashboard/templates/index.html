@@ -3,534 +3,960 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Digital Twin - RATP Dev Casablanca</title>
-    
-    <!-- Styles -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    
-    <!-- Three.js pour la 3D -->
+    <title>Digital Twin 3D - RATP Dev Casablanca</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    
-    <!-- Chart.js pour les graphiques -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
-    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        /* ========== VARIABLES RATP DEV ========== */
+        :root {
+            --color-primary: #0055A4; /* Bleu RATP */
+            --color-secondary: #1A9D49; /* Vert RATP */
+            --color-accent: #00A3E0; /* Bleu clair RATP */
+            --color-warning: #FFA500; /* Orange */
+            --color-danger: #E30613; /* Rouge RATP */
+            --color-success: #1A9D49; /* Vert */
+            
+            --bg-white: #FFFFFF;
+            --bg-light: #F5F7FA;
+            --bg-gray: #E9ECEF;
+            --bg-dark: #343A40;
+            --bg-darker: #212529;
+            
+            --text-primary: #212529;
+            --text-secondary: #6C757D;
+            --text-muted: #868E96;
+            --text-light: #FFFFFF;
+            
+            --border-light: #E9ECEF;
+            --border-medium: #DEE2E6;
+            --border-dark: #CED4DA;
+            
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+            --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            background: var(--bg-light); 
+            color: var(--text-primary); 
+            overflow: hidden; 
         }
         
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-            color: white;
-            overflow-x: hidden;
+        .header { 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            right: 0; 
+            height: 70px; 
+            background: var(--bg-white); 
+            border-bottom: 3px solid var(--color-primary); 
+            display: flex; 
+            align-items: center; 
+            padding: 0 2rem; 
+            z-index: 100; 
+            box-shadow: var(--shadow-md);
         }
         
-        /* Header */
-        .header {
-            background: rgba(15, 23, 42, 0.95);
-            padding: 1rem 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 2px solid #FF6B35;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            backdrop-filter: blur(10px);
+        .logo { 
+            display: flex; 
+            align-items: center; 
+            gap: 1rem; 
         }
         
-        .header h1 {
-            font-size: 1.8rem;
-            background: linear-gradient(135deg, #FF6B35, #FFD93D);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+        .logo i { 
+            font-size: 2rem; 
+            color: var(--color-primary); 
         }
         
-        .nav-buttons {
-            display: flex;
-            gap: 1rem;
+        .logo h1 { 
+            font-size: 1.4rem; 
+            color: var(--color-primary); 
+            font-weight: 700;
+            letter-spacing: -0.3px;
         }
         
-        .nav-btn {
-            padding: 0.7rem 1.5rem;
-            border: none;
-            border-radius: 8px;
-            background: #334155;
-            color: white;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: all 0.3s;
+        .stats { 
+            display: flex; 
+            gap: 2rem; 
+            margin-left: auto; 
         }
         
-        .nav-btn:hover {
-            background: #FF6B35;
-            transform: translateY(-2px);
+        .stat-value { 
+            font-size: 1.5rem; 
+            font-weight: 700; 
+            color: var(--color-primary); 
         }
         
-        .nav-btn.active {
-            background: #FF6B35;
-            box-shadow: 0 4px 15px rgba(255, 107, 53, 0.4);
-        }
-        
-        /* Container principal */
-        .container {
-            display: none;
-            padding: 2rem;
-            animation: fadeIn 0.5s;
-        }
-        
-        .container.active {
-            display: block;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        /* KPI Cards */
-        .kpi-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-        
-        .kpi-card {
-            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-            padding: 1.5rem;
-            border-radius: 12px;
-            border-left: 4px solid #FF6B35;
-            transition: transform 0.3s;
-        }
-        
-        .kpi-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-        }
-        
-        .kpi-label {
-            font-size: 0.9rem;
-            color: #94a3b8;
-            margin-bottom: 0.5rem;
-        }
-        
-        .kpi-value {
-            font-size: 2.5rem;
-            font-weight: bold;
-            color: #FF6B35;
-        }
-        
-        /* Canvas 3D */
-        #canvas3d {
-            width: 100%;
-            height: 600px;
-            border-radius: 12px;
-            background: #0f172a;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-        }
-        
-        /* Charts */
-        .chart-container {
-            background: #1e293b;
-            padding: 2rem;
-            border-radius: 12px;
-            margin-bottom: 2rem;
-        }
-        
-        .chart-title {
-            font-size: 1.3rem;
-            margin-bottom: 1rem;
-            color: #FFD93D;
-        }
-        
-        /* Table */
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: #1e293b;
-            border-radius: 12px;
-            overflow: hidden;
-        }
-        
-        th {
-            background: #334155;
-            padding: 1rem;
-            text-align: left;
+        .stat-label { 
+            font-size: 0.75rem; 
+            color: var(--text-secondary); 
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
             font-weight: 600;
         }
         
-        td {
-            padding: 1rem;
-            border-bottom: 1px solid #334155;
+        .container { 
+            display: flex; 
+            height: calc(100vh - 70px); 
+            margin-top: 70px; 
         }
         
-        tr:hover {
-            background: #2d3748;
+        #canvas3d { 
+            flex: 1; 
+            position: relative; 
+            background: var(--bg-white);
         }
         
-        .status-ok {
-            color: #10b981;
+        .panel { 
+            width: 400px; 
+            background: var(--bg-white); 
+            border-left: 1px solid var(--border-light); 
+            overflow-y: auto; 
+            padding: 1.5rem; 
+            box-shadow: var(--shadow-md);
         }
         
-        .status-warning {
-            color: #f59e0b;
+        .section { 
+            background: var(--bg-white); 
+            border-radius: 12px; 
+            padding: 1.25rem; 
+            margin-bottom: 1.25rem; 
+            border: 1px solid var(--border-light); 
+            box-shadow: var(--shadow-sm);
         }
         
-        .status-critical {
-            color: #ef4444;
+        .section-title { 
+            font-size: 1rem; 
+            font-weight: 700; 
+            color: var(--color-primary); 
+            margin-bottom: 1rem; 
+            display: flex; 
+            align-items: center; 
+            gap: 0.5rem; 
         }
         
-        /* Loading */
-        .loading {
-            text-align: center;
-            padding: 3rem;
-            font-size: 1.2rem;
-            color: #94a3b8;
+        .vehicle-card { 
+            background: var(--bg-white); 
+            border-radius: 10px; 
+            padding: 1rem; 
+            margin-bottom: 0.75rem; 
+            border-left: 4px solid;
+            border: 1px solid var(--border-light);
+            cursor: pointer; 
+            transition: all 0.3s; 
+        }
+        
+        .vehicle-card:hover { 
+            transform: translateY(-3px); 
+            box-shadow: var(--shadow-md); 
+            border-color: var(--color-primary);
+        }
+        
+        .vehicle-card.operational { border-left-color: var(--color-success); }
+        .vehicle-card.delayed { border-left-color: var(--color-warning); }
+        .vehicle-card.maintenance { border-left-color: var(--color-danger); }
+        
+        .vehicle-header { 
+            display: flex; 
+            justify-content: space-between; 
+            margin-bottom: 0.5rem; 
+        }
+        
+        .vehicle-id { 
+            font-weight: 700; 
+            font-size: 1.1rem; 
+            color: var(--text-primary);
+        }
+        
+        .station-name { 
+            font-size: 0.8rem; 
+            color: var(--text-secondary); 
+            margin-top: 0.25rem; 
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        
+        .status-badge { 
+            padding: 0.25rem 0.75rem; 
+            border-radius: 15px; 
+            font-size: 0.75rem; 
+            font-weight: 600; 
+        }
+        
+        .status-badge.ok { 
+            background: rgba(26, 157, 73, 0.1); 
+            color: var(--color-success); 
+        }
+        
+        .status-badge.warning { 
+            background: rgba(255, 165, 0, 0.1); 
+            color: var(--color-warning); 
+        }
+        
+        .status-badge.critical { 
+            background: rgba(227, 6, 19, 0.1); 
+            color: var(--color-danger); 
+        }
+        
+        .info-grid { 
+            display: grid; 
+            grid-template-columns: repeat(2, 1fr); 
+            gap: 0.5rem; 
+            margin-top: 0.75rem; 
+        }
+        
+        .info-item { 
+            background: var(--bg-light); 
+            border-radius: 8px; 
+            padding: 0.5rem; 
+        }
+        
+        .info-label { 
+            color: var(--text-muted); 
+            font-size: 0.7rem; 
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        
+        .info-value { 
+            color: var(--text-primary); 
+            font-weight: 700; 
+            font-size: 1rem; 
+        }
+        
+        .controls { 
+            position: absolute; 
+            bottom: 2rem; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            background: var(--bg-white); 
+            padding: 0.75rem 1.5rem; 
+            border-radius: 30px; 
+            display: flex; 
+            gap: 0.75rem; 
+            z-index: 50; 
+            border: 1px solid var(--border-light);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .control-btn { 
+            padding: 0.6rem 1.25rem; 
+            border: none; 
+            border-radius: 20px; 
+            background: var(--bg-white); 
+            color: var(--text-primary); 
+            cursor: pointer; 
+            font-weight: 600; 
+            transition: all 0.3s; 
+            display: flex; 
+            align-items: center; 
+            gap: 0.5rem; 
+            border: 1px solid var(--border-light);
+        }
+        
+        .control-btn:hover { 
+            background: var(--color-primary); 
+            color: var(--text-light);
+            border-color: var(--color-primary);
+            transform: translateY(-2px); 
+        }
+        
+        .control-btn.active { 
+            background: var(--color-primary); 
+            color: var(--text-light);
+            border-color: var(--color-primary);
+        }
+        
+        .legend { 
+            position: absolute; 
+            top: 1.5rem; 
+            left: 1.5rem; 
+            background: var(--bg-white); 
+            padding: 1rem; 
+            border-radius: 12px; 
+            border: 1px solid var(--border-light);
+            box-shadow: var(--shadow-md);
+        }
+        
+        .legend-title { 
+            font-weight: 700; 
+            margin-bottom: 0.75rem; 
+            color: var(--color-primary); 
+            font-size: 0.95rem; 
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .legend-item { 
+            display: flex; 
+            align-items: center; 
+            gap: 0.5rem; 
+            font-size: 0.75rem; 
+            margin-bottom: 0.4rem; 
+            color: var(--text-secondary);
+        }
+        
+        .legend-color { 
+            width: 16px; 
+            height: 16px; 
+            border-radius: 3px; 
+        }
+        
+        .loading { 
+            position: fixed; 
+            inset: 0; 
+            background: var(--bg-white); 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            z-index: 999; 
+        }
+        
+        .spinner { 
+            width: 60px; 
+            height: 60px; 
+            border: 4px solid var(--bg-gray); 
+            border-top-color: var(--color-primary); 
+            border-radius: 50%; 
+            animation: spin 1s linear infinite; 
+        }
+        
+        @keyframes spin { 
+            to { transform: rotate(360deg); } 
+        }
+        
+        .panel::-webkit-scrollbar { 
+            width: 6px; 
+        }
+        
+        .panel::-webkit-scrollbar-track { 
+            background: var(--bg-light); 
+        }
+        
+        .panel::-webkit-scrollbar-thumb { 
+            background: var(--border-medium); 
+            border-radius: 3px; 
         }
     </style>
 </head>
 <body>
-    <!-- Header -->
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <div style="margin-top: 1.5rem; color: var(--text-secondary);">Chargement du Digital Twin...</div>
+    </div>
+    
     <div class="header">
-        <h1>🚊 Digital Twin - RATP Dev Casablanca</h1>
-        <div class="nav-buttons">
-            <button class="nav-btn active" onclick="showView('overview')">Vue d'ensemble</button>
-            <button class="nav-btn" onclick="showView('3d')">Visualisation 3D</button>
-            <button class="nav-btn" onclick="showView('analytics')">Analytics ML</button>
-            <button class="nav-btn" onclick="showView('maintenance')">Maintenance</button>
+        <div class="logo">
+            <i class="fas fa-subway"></i>
+            <h1>Digital Twin 3D - RATP Dev Casablanca</h1>
+        </div>
+        <div class="stats">
+            <div><div class="stat-value" id="stat-vehicles">0</div><div class="stat-label">Véhicules</div></div>
+            <div><div class="stat-value" id="stat-passengers">0</div><div class="stat-label">Passagers</div></div>
+            <div><div class="stat-value" id="stat-delay">0</div><div class="stat-label">Retard moy.</div></div>
         </div>
     </div>
     
-    <!-- Vue d'ensemble -->
-    <div id="overview" class="container active">
-        <h2 style="margin-bottom: 2rem;">📊 Tableau de bord en temps réel</h2>
-        
-        <!-- KPIs -->
-        <div class="kpi-grid" id="kpi-grid">
-            <div class="kpi-card">
-                <div class="kpi-label">Tramways actifs</div>
-                <div class="kpi-value" id="kpi-trams">--</div>
+    <div class="container">
+        <div id="canvas3d">
+            <div class="legend">
+                <div class="legend-title"><i class="fas fa-map-signs"></i> Réseau Casablanca</div>
+                <div class="legend-item"><div class="legend-color" style="background: #FF6B35;"></div><span>T1 - Sidi Moumen ↔ Lissasfa</span></div>
+                <div class="legend-item"><div class="legend-color" style="background: #FFD93D;"></div><span>T2 - Aïn Diab ↔ Facultés</span></div>
+                <div class="legend-item"><div class="legend-color" style="background: #3B82F6;"></div><span>T3 - Hay Hassani ↔ Casa Port</span></div>
+                <div class="legend-item"><div class="legend-color" style="background: #8B5CF6;"></div><span>T4 - Lissasfa ↔ Sidi Bernoussi</span></div>
             </div>
-            <div class="kpi-card">
-                <div class="kpi-label">Retard moyen</div>
-                <div class="kpi-value" id="kpi-delay">--</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-label">Passagers totaux</div>
-                <div class="kpi-value" id="kpi-passengers">--</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-label">Incidents</div>
-                <div class="kpi-value" id="kpi-incidents">--</div>
+            
+            <div class="controls">
+                <button class="control-btn active" onclick="toggleSim()"><i class="fas fa-pause"></i><span>Pause</span></button>
+                <button class="control-btn" onclick="changeView('top')"><i class="fas fa-map"></i> Vue carte</button>
+                <button class="control-btn" onclick="changeView('angle')"><i class="fas fa-cube"></i> Vue 3D</button>
+                <button class="control-btn" onclick="resetView()"><i class="fas fa-redo"></i> Reset</button>
             </div>
         </div>
         
-        <!-- Graphiques -->
-        <div class="chart-container">
-            <div class="chart-title">Retards par heure</div>
-            <canvas id="delayChart"></canvas>
-        </div>
-        
-        <div class="chart-container">
-            <div class="chart-title">Affluence par ligne</div>
-            <canvas id="lineChart"></canvas>
-        </div>
-    </div>
-    
-    <!-- Vue 3D -->
-    <div id="3d" class="container">
-        <h2 style="margin-bottom: 2rem;">🎮 Visualisation 3D du réseau</h2>
-        <div id="canvas3d"></div>
-        <div style="margin-top: 1rem; text-align: center; color: #94a3b8;">
-            Utilisez la souris pour naviguer dans la scène 3D
-        </div>
-    </div>
-    
-    <!-- Analytics ML -->
-    <div id="analytics" class="container">
-        <h2 style="margin-bottom: 2rem;">🧠 Analytics & Machine Learning</h2>
-        
-        <div class="chart-container">
-            <div class="chart-title">Prédictions des retards (RandomForest)</div>
-            <canvas id="predictionChart"></canvas>
-        </div>
-        
-        <div class="chart-container">
-            <div class="chart-title">Performance du modèle</div>
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; margin-top: 1rem;">
-                <div style="text-align: center;">
-                    <div style="font-size: 3rem; color: #10b981;">0.87</div>
-                    <div style="color: #94a3b8;">R² Score</div>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 3rem; color: #3b82f6;">0.82 min</div>
-                    <div style="color: #94a3b8;">MAE</div>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 3rem; color: #a78bfa;">92%</div>
-                    <div style="color: #94a3b8;">Précision Maintenance</div>
-                </div>
+        <div class="panel">
+            <div class="section">
+                <div class="section-title"><i class="fas fa-train"></i> Véhicules Actifs</div>
+                <div id="vehicles-list"></div>
+            </div>
+            <div class="section">
+                <div class="section-title"><i class="fas fa-chart-line"></i> Santé du Réseau</div>
+                <canvas id="health-chart" height="150"></canvas>
             </div>
         </div>
     </div>
-    
-    <!-- Maintenance -->
-    <div id="maintenance" class="container">
-        <h2 style="margin-bottom: 2rem;">🔧 Alertes de maintenance</h2>
-        
-        <table id="maintenanceTable">
-            <thead>
-                <tr>
-                    <th>Tramway</th>
-                    <th>Composant</th>
-                    <th>Température (°C)</th>
-                    <th>Vibration</th>
-                    <th>État</th>
-                </tr>
-            </thead>
-            <tbody id="maintenanceBody">
-                <tr>
-                    <td colspan="5" class="loading">Chargement des données...</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-    
+
     <script>
-        // ============================================================================
-        // GESTION DES VUES
-        // ============================================================================
+        let scene, camera, renderer, vehicles = [], isRunning = true, chart;
         
-        function showView(view) {
-            // Masquer toutes les vues
-            document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
-            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-            
-            // Afficher la vue sélectionnée
-            document.getElementById(view).classList.add('active');
-            event.target.classList.add('active');
-            
-            // Initialiser selon la vue
-            if (view === '3d') {
-                init3D();
-            } else if (view === 'analytics') {
-                loadPredictions();
-            } else if (view === 'maintenance') {
-                loadMaintenance();
+        const lines = {
+            T1: { 
+                color: 0xFF6B35, 
+                stations: [
+                    {name: "Sidi Moumen", x: -150, z: 150},
+                    {name: "Hay Hassani", x: -100, z: 100},
+                    {name: "Ibn Tachfine", x: -70, z: 70},
+                    {name: "Casa-Voyageurs", x: -30, z: 40},
+                    {name: "Nations-Unies", x: 0, z: 0},
+                    {name: "Mohammed V", x: 30, z: -20},
+                    {name: "Hassan II", x: 60, z: -40},
+                    {name: "Abdelmoumen", x: 90, z: -60},
+                    {name: "Facultés", x: 120, z: -80},
+                    {name: "Lissasfa", x: 150, z: -100}
+                ]
+            },
+            T2: { 
+                color: 0xFFD93D, 
+                stations: [
+                    {name: "Aïn Diab", x: -150, z: -50},
+                    {name: "Corniche", x: -110, z: -50},
+                    {name: "Anfa", x: -70, z: -50},
+                    {name: "Abdelmoumen", x: -30, z: -50},
+                    {name: "Zerktouni", x: 0, z: -50},
+                    {name: "Oasis", x: 40, z: -50},
+                    {name: "Moulay Rachid", x: 80, z: -50},
+                    {name: "Facultés", x: 120, z: -50}
+                ]
+            },
+            T3: { 
+                color: 0x3B82F6, 
+                stations: [
+                    {name: "Hay Hassani", x: -100, z: 100},
+                    {name: "Hay Mohammadi", x: -60, z: 80},
+                    {name: "Derb Sultan", x: -20, z: 60},
+                    {name: "Casa-Port", x: 20, z: 40},
+                    {name: "Roches Noires", x: 60, z: 60},
+                    {name: "Aïn Sebaâ", x: 100, z: 80}
+                ]
+            },
+            T4: { 
+                color: 0x8B5CF6, 
+                stations: [
+                    {name: "Lissasfa", x: 150, z: -100},
+                    {name: "Californie", x: 130, z: -70},
+                    {name: "Oasis", x: 100, z: -40},
+                    {name: "Hay Hassani", x: 60, z: -10},
+                    {name: "Derb Ghallef", x: 30, z: 20},
+                    {name: "Sidi Bernoussi", x: 0, z: 50},
+                    {name: "Sidi Moumen", x: -40, z: 80}
+                ]
             }
-        }
+        };
         
-        // ============================================================================
-        // CHARGEMENT DES DONNÉES
-        // ============================================================================
-        
-        async function loadKPIs() {
-            try {
-                const response = await fetch('/api/analytics/global');
-                const data = await response.json();
-                
-                document.getElementById('kpi-trams').textContent = data.global.active_trams;
-                document.getElementById('kpi-delay').textContent = data.global.avg_delay.toFixed(1) + ' min';
-                document.getElementById('kpi-passengers').textContent = data.global.total_passengers.toLocaleString();
-                document.getElementById('kpi-incidents').textContent = data.global.total_incidents;
-                
-                // Graphiques
-                createDelayChart(data.by_hour);
-                createLineChart(data.by_line);
-            } catch (error) {
-                console.error('Erreur chargement KPIs:', error);
-            }
-        }
-        
-        function createDelayChart(data) {
-            const ctx = document.getElementById('delayChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: data.map(d => d.hour + 'h'),
-                    datasets: [{
-                        label: 'Retard moyen (min)',
-                        data: data.map(d => d.avg_delay),
-                        borderColor: '#FF6B35',
-                        backgroundColor: 'rgba(255, 107, 53, 0.1)',
-                        tension: 0.4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: { labels: { color: 'white' } }
-                    },
-                    scales: {
-                        y: { ticks: { color: 'white' }, grid: { color: '#334155' } },
-                        x: { ticks: { color: 'white' }, grid: { color: '#334155' } }
-                    }
-                }
-            });
-        }
-        
-        function createLineChart(data) {
-            const ctx = document.getElementById('lineChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: data.map(d => 'Ligne ' + d.line),
-                    datasets: [{
-                        label: 'Passagers moyens',
-                        data: data.map(d => d.avg_passengers),
-                        backgroundColor: ['#FF6B35', '#FFD93D', '#A78BFA', '#60A5FA']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: { labels: { color: 'white' } }
-                    },
-                    scales: {
-                        y: { ticks: { color: 'white' }, grid: { color: '#334155' } },
-                        x: { ticks: { color: 'white' }, grid: { color: '#334155' } }
-                    }
-                }
-            });
-        }
-        
-        async function loadPredictions() {
-            try {
-                const response = await fetch('/api/predictions/delays');
-                const data = await response.json();
-                
-                const ctx = document.getElementById('predictionChart').getContext('2d');
-                new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: data.predictions.map(p => p.hour),
-                        datasets: [{
-                            label: 'Retard prédit (min)',
-                            data: data.predictions.map(p => p.predicted_delay),
-                            borderColor: '#A78BFA',
-                            backgroundColor: 'rgba(167, 139, 250, 0.1)',
-                            tension: 0.4
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            legend: { labels: { color: 'white' } }
-                        },
-                        scales: {
-                            y: { ticks: { color: 'white' }, grid: { color: '#334155' } },
-                            x: { ticks: { color: 'white' }, grid: { color: '#334155' } }
-                        }
-                    }
-                });
-            } catch (error) {
-                console.error('Erreur prédictions:', error);
-            }
-        }
-        
-        async function loadMaintenance() {
-            try {
-                const response = await fetch('/api/maintenance/alerts');
-                const data = await response.json();
-                
-                const tbody = document.getElementById('maintenanceBody');
-                tbody.innerHTML = '';
-                
-                data.alerts.forEach(alert => {
-                    const row = tbody.insertRow();
-                    row.innerHTML = `
-                        <td>${alert.tram_id}</td>
-                        <td>${alert.component}</td>
-                        <td class="${alert.temperature > 75 ? 'status-critical' : 'status-warning'}">
-                            ${alert.temperature.toFixed(1)}°C
-                        </td>
-                        <td class="${alert.vibration > 5.5 ? 'status-critical' : 'status-ok'}">
-                            ${alert.vibration.toFixed(2)}
-                        </td>
-                        <td class="${alert.failure ? 'status-critical' : 'status-warning'}">
-                            ${alert.failure ? '🔴 Panne' : '🟡 Risque'}
-                        </td>
-                    `;
-                });
-            } catch (error) {
-                console.error('Erreur maintenance:', error);
-            }
-        }
-        
-        // ============================================================================
-        // VISUALISATION 3D (SIMPLIFIÉE)
-        // ============================================================================
-        
-        function init3D() {
+        function init() {
             const container = document.getElementById('canvas3d');
-            if (container.children.length > 0) return; // Déjà initialisé
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xF5F7FA); // Couleur claire RATP
+            scene.fog = new THREE.Fog(0xF5F7FA, 150, 400);
             
-            const scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x0f172a);
-            
-            const camera = new THREE.PerspectiveCamera(75, container.clientWidth / 600, 0.1, 1000);
-            camera.position.set(50, 40, 50);
-            
-            const renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(container.clientWidth, 600);
-            container.appendChild(renderer.domElement);
-            
-            // Lumières
-            const light = new THREE.AmbientLight(0xffffff, 0.6);
-            scene.add(light);
-            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            dirLight.position.set(50, 50, 50);
-            scene.add(dirLight);
-            
-            // Sol
-            const groundGeometry = new THREE.PlaneGeometry(200, 200);
-            const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x1e293b });
-            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-            ground.rotation.x = -Math.PI / 2;
-            scene.add(ground);
-            
-            // Grille
-            const gridHelper = new THREE.GridHelper(200, 50, 0x334155, 0x1e293b);
-            scene.add(gridHelper);
-            
-            // Créer quelques tramways
-            for (let i = 0; i < 5; i++) {
-                const tramGeometry = new THREE.BoxGeometry(2, 1.5, 4);
-                const tramMaterial = new THREE.MeshStandardMaterial({ 
-                    color: 0xFF6B35,
-                    metalness: 0.7,
-                    roughness: 0.3
-                });
-                const tram = new THREE.Mesh(tramGeometry, tramMaterial);
-                tram.position.set(
-                    Math.random() * 40 - 20,
-                    0.75,
-                    Math.random() * 40 - 20
-                );
-                scene.add(tram);
-            }
-            
+            camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(0, 200, 150);
             camera.lookAt(0, 0, 0);
             
-            // Animation
-            function animate() {
-                requestAnimationFrame(animate);
-                scene.rotation.y += 0.001;
-                renderer.render(scene, camera);
-            }
-            animate();
+            renderer = new THREE.WebGLRenderer({ 
+                antialias: true,
+                alpha: true 
+            });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+            
+            // Lumière
+            scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(100, 200, 100);
+            scene.add(dirLight);
+            
+            // Créer la texture SVG intégrée
+            createSVGTexture();
+            
+            // Construire le réseau de tramway
+            buildNetwork();
+            
+            // Créer les véhicules
+            createVehicles();
+            
+            // Initialiser le graphique
+            initChart();
+            
+            // Masquer l'écran de chargement et démarrer l'animation
+            setTimeout(() => {
+                document.getElementById('loading').style.display = 'none';
+                animate();
+            }, 1000);
+            
+            // Gestion du redimensionnement
+            window.addEventListener('resize', () => {
+                camera.aspect = container.clientWidth / container.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(container.clientWidth, container.clientHeight);
+            });
         }
         
-        // ============================================================================
-        // INITIALISATION
-        // ============================================================================
+        function createSVGTexture() {
+            // Créer un canevas pour dessiner le SVG
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 2048;
+            canvas.height = 1152; // 2048 x 1152 (ratio 16:9)
+            
+            // Dessiner le fond blanc
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Dessiner le contour de la carte
+            ctx.fillStyle = '#F8F9FA';
+            ctx.beginPath();
+            // Simplifier le chemin complexe du SVG en un rectangle avec quelques détails
+            ctx.rect(100, 100, canvas.width - 200, canvas.height - 200);
+            ctx.fill();
+            
+            // Dessiner les lignes principales du réseau
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            // Ligne T1 (rouge/orange) - Sidi Moumen ↔ Lissasfa
+            ctx.beginPath();
+            ctx.moveTo(200, 300);
+            ctx.lineTo(400, 350);
+            ctx.lineTo(600, 400);
+            ctx.lineTo(800, 450);
+            ctx.lineTo(1000, 500);
+            ctx.lineTo(1200, 550);
+            ctx.lineTo(1400, 600);
+            ctx.lineTo(1600, 650);
+            ctx.lineTo(1800, 700);
+            ctx.strokeStyle = '#FF6B35';
+            ctx.lineWidth = 12;
+            ctx.stroke();
+            
+            // Ligne T2 (jaune) - Aïn Diab ↔ Facultés
+            ctx.beginPath();
+            ctx.moveTo(200, 800);
+            ctx.lineTo(400, 800);
+            ctx.lineTo(600, 800);
+            ctx.lineTo(800, 800);
+            ctx.lineTo(1000, 800);
+            ctx.lineTo(1200, 800);
+            ctx.lineTo(1400, 800);
+            ctx.lineTo(1600, 800);
+            ctx.strokeStyle = '#FFD93D';
+            ctx.lineWidth = 12;
+            ctx.stroke();
+            
+            // Ligne T3 (bleu) - Hay Hassani ↔ Casa Port
+            ctx.beginPath();
+            ctx.moveTo(400, 350);
+            ctx.lineTo(500, 450);
+            ctx.lineTo(600, 550);
+            ctx.lineTo(700, 650);
+            ctx.lineTo(800, 750);
+            ctx.lineTo(900, 850);
+            ctx.strokeStyle = '#3B82F6';
+            ctx.lineWidth = 12;
+            ctx.stroke();
+            
+            // Ligne T4 (violet) - Lissasfa ↔ Sidi Bernoussi
+            ctx.beginPath();
+            ctx.moveTo(1800, 700);
+            ctx.lineTo(1600, 600);
+            ctx.lineTo(1400, 500);
+            ctx.lineTo(1200, 400);
+            ctx.lineTo(1000, 300);
+            ctx.lineTo(800, 200);
+            ctx.lineTo(600, 250);
+            ctx.strokeStyle = '#8B5CF6';
+            ctx.lineWidth = 12;
+            ctx.stroke();
+            
+            // Ajouter des points pour les stations
+            const stations = [
+                {x: 200, y: 300, name: "Sidi Moumen", color: '#FF6B35'},
+                {x: 400, y: 350, name: "Hay Hassani", color: '#FF6B35'},
+                {x: 600, y: 400, name: "Ibn Tachfine", color: '#FF6B35'},
+                {x: 800, y: 450, name: "Casa-Voyageurs", color: '#FF6B35'},
+                {x: 1000, y: 500, name: "Nations-Unies", color: '#FF6B35'},
+                {x: 1200, y: 550, name: "Mohammed V", color: '#FF6B35'},
+                {x: 1400, y: 600, name: "Hassan II", color: '#FF6B35'},
+                {x: 1600, y: 650, name: "Abdelmoumen", color: '#FF6B35'},
+                {x: 1800, y: 700, name: "Lissasfa", color: '#FF6B35'},
+                
+                {x: 200, y: 800, name: "Aïn Diab", color: '#FFD93D'},
+                {x: 400, y: 800, name: "Corniche", color: '#FFD93D'},
+                {x: 600, y: 800, name: "Anfa", color: '#FFD93D'},
+                {x: 800, y: 800, name: "Abdelmoumen", color: '#FFD93D'},
+                {x: 1000, y: 800, name: "Zerktouni", color: '#FFD93D'},
+                {x: 1200, y: 800, name: "Oasis", color: '#FFD93D'},
+                {x: 1400, y: 800, name: "Moulay Rachid", color: '#FFD93D'},
+                {x: 1600, y: 800, name: "Facultés", color: '#FFD93D'},
+                
+                {x: 400, y: 350, name: "Hay Hassani", color: '#3B82F6'},
+                {x: 500, y: 450, name: "Hay Mohammadi", color: '#3B82F6'},
+                {x: 600, y: 550, name: "Derb Sultan", color: '#3B82F6'},
+                {x: 700, y: 650, name: "Casa-Port", color: '#3B82F6'},
+                {x: 800, y: 750, name: "Roches Noires", color: '#3B82F6'},
+                {x: 900, y: 850, name: "Aïn Sebaâ", color: '#3B82F6'},
+                
+                {x: 1800, y: 700, name: "Lissasfa", color: '#8B5CF6'},
+                {x: 1600, y: 600, name: "Californie", color: '#8B5CF6'},
+                {x: 1400, y: 500, name: "Oasis", color: '#8B5CF6'},
+                {x: 1200, y: 400, name: "Hay Hassani", color: '#8B5CF6'},
+                {x: 1000, y: 300, name: "Derb Ghallef", color: '#8B5CF6'},
+                {x: 800, y: 200, name: "Sidi Bernoussi", color: '#8B5CF6'},
+                {x: 600, y: 250, name: "Sidi Moumen", color: '#8B5CF6'}
+            ];
+            
+            // Dessiner les stations
+            stations.forEach(station => {
+                ctx.beginPath();
+                ctx.arc(station.x, station.y, 15, 0, Math.PI * 2);
+                ctx.fillStyle = station.color;
+                ctx.fill();
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                
+                // Ajouter le nom de la station (simplifié)
+                ctx.fillStyle = '#212529';
+                ctx.font = 'bold 16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(station.name.split(' ')[0], station.x, station.y - 25);
+            });
+            
+            // Ajouter le titre de la carte
+            ctx.fillStyle = '#0055A4';
+            ctx.font = 'bold 32px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Réseau Tramway Casablanca', canvas.width/2, 50);
+            
+            // Ajouter la mention RATP DEV
+            ctx.fillStyle = '#1A9D49';
+            ctx.font = '600 18px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('RATP DEV • Digital Twin', canvas.width/2, canvas.height - 40);
+            
+            // Créer la texture à partir du canevas
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(1, 1);
+            
+            // Créer le sol avec la texture
+            const groundGeo = new THREE.PlaneGeometry(400, 225); // Ratio 16:9
+            const groundMat = new THREE.MeshStandardMaterial({ 
+                map: texture,
+                side: THREE.DoubleSide
+            });
+            
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.y = 0;
+            scene.add(ground);
+            
+            
+        }
         
-        loadKPIs();
-        setInterval(loadKPIs, 10000); // Rafraîchir toutes les 10s
+        function buildNetwork() {
+            Object.entries(lines).forEach(([id, data]) => {
+                // Créer les rails
+                const points = data.stations.map(s => new THREE.Vector3(s.x, 0.5, s.z));
+                const curve = new THREE.CatmullRomCurve3(points);
+                const trackGeo = new THREE.TubeGeometry(curve, 200, 0.6, 16, false);
+                const track = new THREE.Mesh(trackGeo, new THREE.MeshStandardMaterial({ 
+                    color: data.color, 
+                    emissive: data.color, 
+                    emissiveIntensity: 0.4 
+                }));
+                scene.add(track);
+                
+                // Créer les stations
+                data.stations.forEach(s => {
+                    // Plateforme de la station
+                    const station = new THREE.Mesh(
+                        new THREE.CylinderGeometry(2, 2, 0.4, 16),
+                        new THREE.MeshStandardMaterial({ color: 0x6C757D }) // Gris RATP
+                    );
+                    station.position.set(s.x, 0.2, s.z);
+                    scene.add(station);
+                    
+                    // Poteau indicateur
+                    const marker = new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.3, 0.3, 5, 8),
+                        new THREE.MeshStandardMaterial({ 
+                            color: data.color, 
+                            emissive: data.color, 
+                            emissiveIntensity: 0.8 
+                        })
+                    );
+                    marker.position.set(s.x, 2.5, s.z);
+                    scene.add(marker);
+                    
+                    // Lumière au sommet
+                    const light = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.5, 8, 8),
+                        new THREE.MeshBasicMaterial({ color: data.color })
+                    );
+                    light.position.set(s.x, 5, s.z);
+                    scene.add(light);
+                });
+            });
+        }
+        
+        function createVehicles() {
+            let id = 1;
+            Object.entries(lines).forEach(([lineId, data]) => {
+                const count = lineId === 'T1' ? 8 : 6;
+                for (let i = 0; i < count; i++) {
+                    const vehicle = createVehicle(data.color);
+                    const stationIdx = Math.floor((i / count) * data.stations.length);
+                    const s = data.stations[stationIdx];
+                    vehicle.position.set(s.x, 1.2, s.z);
+                    
+                    vehicle.userData = {
+                        id: `${lineId}-${String(id++).padStart(3, '0')}`,
+                        line: lineId,
+                        currentIdx: stationIdx,
+                        targetIdx: (stationIdx + 1) % data.stations.length,
+                        progress: Math.random(),
+                        speed: 0.002 + Math.random() * 0.0015,
+                        passengers: Math.floor(Math.random() * 280),
+                        delay: Math.random() * 5,
+                        status: Math.random() > 0.9 ? 'maintenance' : Math.random() > 0.8 ? 'delayed' : 'operational',
+                        health: 70 + Math.random() * 30,
+                        currentStation: data.stations[stationIdx].name
+                    };
+                    
+                    scene.add(vehicle);
+                    vehicles.push(vehicle);
+                }
+            });
+            updateVehiclesList();
+        }
+        
+        function createVehicle(color) {
+            const group = new THREE.Group();
+            
+            // Corps du véhicule
+            const body = new THREE.Mesh(
+                new THREE.BoxGeometry(2.2, 1.8, 4.5),
+                new THREE.MeshStandardMaterial({ 
+                    color: color, 
+                    metalness: 0.8, 
+                    roughness: 0.2 
+                })
+            );
+            body.position.y = 0.9;
+            group.add(body);
+            
+            // Fenêtres
+            for (let i = 0; i < 3; i++) {
+                const win = new THREE.Mesh(
+                    new THREE.BoxGeometry(2.1, 0.7, 1),
+                    new THREE.MeshStandardMaterial({ 
+                        color: 0x87CEEB, 
+                        transparent: true, 
+                        opacity: 0.7 
+                    })
+                );
+                win.position.set(0, 1.5, -1.5 + i * 1.5);
+                group.add(win);
+            }
+            
+            // Roues
+            [[-0.7, 0.35, -1.5], [0.7, 0.35, -1.5], 
+             [-0.7, 0.35, 1.5], [0.7, 0.35, 1.5]].forEach(pos => {
+                const wheel = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.35, 0.35, 0.25, 16),
+                    new THREE.MeshStandardMaterial({ color: 0x333333 }) // Noir
+                );
+                wheel.rotation.z = Math.PI / 2;
+                wheel.position.set(pos[0], pos[1], pos[2]);
+                group.add(wheel);
+            });
+            
+            return group;
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (isRunning) {
+                // Animer les véhicules
+                vehicles.forEach(v => {
+                    const d = v.userData;
+                    const lineData = lines[d.line];
+                    const current = lineData.stations[d.currentIdx];
+                    const target = lineData.stations[d.targetIdx];
+                    
+                    d.progress += d.speed;
+                    
+                    if (d.progress >= 1) {
+                        d.progress = 0;
+                        d.currentIdx = d.targetIdx;
+                        d.targetIdx = (d.targetIdx + 1) % lineData.stations.length;
+                        d.passengers = Math.max(0, Math.min(280, d.passengers + Math.floor(Math.random() * 40 - 20)));
+                        d.currentStation = lineData.stations[d.currentIdx].name;
+                    }
+                    
+                    // Déplacement entre stations
+                    v.position.x = current.x + (target.x - current.x) * d.progress;
+                    v.position.z = current.z + (target.z - current.z) * d.progress;
+                    
+                    // Orientation
+                    const angle = Math.atan2(target.z - current.z, target.x - current.x);
+                    v.rotation.y = -angle + Math.PI / 2;
+                });
+                
+                // Mettre à jour l'interface périodiquement
+                if (Date.now() % 2000 < 16) {
+                    updateVehiclesList();
+                    updateStats();
+                }
+            }
+            
+            renderer.render(scene, camera);
+        }
+        
+        function updateVehiclesList() {
+            const container = document.getElementById('vehicles-list');
+            container.innerHTML = '';
+            
+            vehicles.slice(0, 8).forEach(v => {
+                const d = v.userData;
+                const card = document.createElement('div');
+                card.className = `vehicle-card ${d.status}`;
+                
+                const healthColor = d.health > 80 ? '#1A9D49' : d.health > 60 ? '#FFA500' : '#E30613';
+                
+                card.innerHTML = `
+                    <div class="vehicle-header">
+                        <div>
+                            <div class="vehicle-id">${d.id}</div>
+                            <div class="station-name">📍 ${d.currentStation}</div>
+                        </div>
+                        <div class="status-badge ${d.status === 'operational' ? 'ok' : d.status === 'delayed' ? 'warning' : 'critical'}">
+                            ${d.status === 'operational' ? '🟢' : d.status === 'delayed' ? '🟡' : '🔴'}
+                        </div>
+                    </div>
+                    <div class="info-grid">
+                        <div class="info-item"><div class="info-label">Passagers</div><div class="info-value">${d.passengers}/280</div></div>
+                        <div class="info-item"><div class="info-label">Retard</div><div class="info-value">${d.delay.toFixed(1)} min</div></div>
+                        <div class="info-item"><div class="info-label">Santé</div><div class="info-value" style="color: ${healthColor}">${d.health.toFixed(0)}%</div></div>
+                        <div class="info-item"><div class="info-label">Ligne</div><div class="info-value">${d.line}</div></div>
+                    </div>
+                `;
+                
+                container.appendChild(card);
+            });
+        }
+        
+        function updateStats() {
+            const totalPass = vehicles.reduce((sum, v) => sum + v.userData.passengers, 0);
+            const avgDelay = vehicles.reduce((sum, v) => sum + v.userData.delay, 0) / vehicles.length;
+            
+            document.getElementById('stat-vehicles').textContent = vehicles.length;
+            document.getElementById('stat-passengers').textContent = Math.floor(totalPass / 100) * 100;
+            document.getElementById('stat-delay').textContent = avgDelay.toFixed(1) + ' min';
+        }
+        
+        function initChart() {
+            const ctx = document.getElementById('health-chart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['6h', '8h', '10h', '12h', '14h', '16h', '18h', '20h'],
+                    datasets: [{
+                        label: 'Santé Moyenne',
+                        data: [92, 90, 88, 85, 87, 84, 82, 81],
+                        borderColor: '#1A9D49',
+                        backgroundColor: 'rgba(26, 157, 73, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { 
+                                color: 'rgba(0, 0, 0, 0.05)',
+                                drawBorder: false
+                            },
+                            ticks: { 
+                                color: '#6C757D',
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        },
+                        y: {
+                            grid: { 
+                                color: 'rgba(0, 0, 0, 0.05)',
+                                drawBorder: false
+                            },
+                            ticks: { 
+                                color: '#6C757D',
+                                font: {
+                                    size: 11
+                                },
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            },
+                            min: 70,
+                            max: 100
+                        }
+                    },
+                    elements: {
+                        point: {
+                            radius: 3,
+                            hoverRadius: 6,
+                            backgroundColor: '#1A9D49'
+                        }
+                    }
+                }
+            });
+        }
+        
+        function toggleSim() {
+            isRunning = !isRunning;
+            const btn = document.querySelector('.control-btn');
+            btn.classList.toggle('active');
+            btn.innerHTML = isRunning ? 
+                '<i class="fas fa-pause"></i><span>Pause</span>' : 
+                '<i class="fas fa-play"></i><span>Play</span>';
+        }
+        
+        function changeView(mode) {
+            if (mode === 'top') {
+                camera.position.set(0, 250, 0);
+                camera.lookAt(0, 0, 0);
+            } else {
+                camera.position.set(150, 120, 150);
+                camera.lookAt(0, 0, 0);
+            }
+        }
+        
+        function resetView() {
+            camera.position.set(0, 200, 150);
+            camera.lookAt(0, 0, 0);
+        }
+        
+        window.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
 </html>
