@@ -1,962 +1,2216 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Digital Twin 3D - RATP Dev Casablanca</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <title>CasaTram — Jumeau Numérique</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js'></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css' rel='stylesheet' />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
-        /* ========== VARIABLES RATP DEV ========== */
         :root {
-            --color-primary: #0055A4; /* Bleu RATP */
-            --color-secondary: #1A9D49; /* Vert RATP */
-            --color-accent: #00A3E0; /* Bleu clair RATP */
-            --color-warning: #FFA500; /* Orange */
-            --color-danger: #E30613; /* Rouge RATP */
-            --color-success: #1A9D49; /* Vert */
-            
-            --bg-white: #FFFFFF;
-            --bg-light: #F5F7FA;
-            --bg-gray: #E9ECEF;
-            --bg-dark: #343A40;
-            --bg-darker: #212529;
-            
-            --text-primary: #212529;
-            --text-secondary: #6C757D;
-            --text-muted: #868E96;
-            --text-light: #FFFFFF;
-            
-            --border-light: #E9ECEF;
-            --border-medium: #DEE2E6;
-            --border-dark: #CED4DA;
-            
-            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
-            --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
-            --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.1);
+            --bg-dark: #eaedf4;
+            --bg-panel: #ffffff;
+            --bg-card: #0c0c0c;
+            --border: rgba(109, 110, 182, 0.07);
+            --accent: #e86831;
+            --accent2: #00d4aa;
+            --ok: #22c55e;
+            --warn: #f59e0b;
+            --crit: #ef4444;
+            --text: #16212f;
+            --text-muted: #64748b;
+            --t1: #E86831;
+            --t2: #F2CB07;
+            --t3: #D9328E;
+            --t4: #003DA5;
+            --bw1: #00843D;
+            --bw2: #00A3E0;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        
-        body { 
-            font-family: 'Segoe UI', sans-serif; 
-            background: var(--bg-light); 
-            color: var(--text-primary); 
-            overflow: hidden; 
+
+        body {
+            font-family: 'Sora', sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            background: var(--bg-dark);
+            color: var(--text);
         }
-        
-        .header { 
-            position: fixed; 
-            top: 0; 
-            left: 0; 
-            right: 0; 
-            height: 70px; 
-            background: var(--bg-white); 
-            border-bottom: 3px solid var(--color-primary); 
-            display: flex; 
-            align-items: center; 
-            padding: 0 2rem; 
-            z-index: 100; 
-            box-shadow: var(--shadow-md);
+
+        /* ===== LAYOUT ===== */
+        .app-shell {
+            display: grid;
+            grid-template-columns: 280px 1fr 320px;
+            grid-template-rows: 52px 1fr;
+            height: 100vh;
+            gap: 0;
         }
-        
-        .logo { 
-            display: flex; 
-            align-items: center; 
-            gap: 1rem; 
+
+        /* ===== TOPBAR ===== */
+        .topbar {
+            grid-column: 1 / -1;
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            gap: 20px;
+            position: relative;
+            z-index: 100;
         }
-        
-        .logo i { 
-            font-size: 2rem; 
-            color: var(--color-primary); 
-        }
-        
-        .logo h1 { 
-            font-size: 1.4rem; 
-            color: var(--color-primary); 
+
+        .topbar-brand {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1rem;
             font-weight: 700;
-            letter-spacing: -0.3px;
+            color: var(--accent);
+            letter-spacing: 2px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
-        
-        .stats { 
-            display: flex; 
-            gap: 2rem; 
-            margin-left: auto; 
+        .topbar-brand span { color: var(--text); font-weight: 400; }
+
+        .topbar-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
         }
-        
-        .stat-value { 
-            font-size: 1.5rem; 
-            font-weight: 700; 
-            color: var(--color-primary); 
+        .status-dot {
+            width: 7px; height: 7px; border-radius: 50%;
+            background: var(--ok);
+            box-shadow: 0 0 8px var(--ok);
+            animation: pulse-ok 2s ease-in-out infinite;
         }
-        
-        .stat-label { 
-            font-size: 0.75rem; 
-            color: var(--text-secondary); 
+        @keyframes pulse-ok {
+            0%,100% { opacity:1; } 50% { opacity:0.5; }
+        }
+
+        .topbar-kpis {
+            display: flex;
+            gap: 24px;
+            margin-left: auto;
+        }
+        .kpi-chip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .kpi-chip strong {
+            color: var(--text);
+            font-size: 0.8rem;
+        }
+
+        /* ===== LEFT PANEL — FLEET ===== */
+        .panel-left {
+            background: var(--bg-panel);
+            border-right: 1px solid var(--border);
+            overflow-y: auto;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-section-title {
+            padding: 14px 16px 10px;
+            font-size: 0.65rem;
+            font-family: 'JetBrains Mono', monospace;
+            letter-spacing: 2px;
+            color: var(--text-muted);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .fleet-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: background 0.15s;
+            position: relative;
+        }
+        .fleet-item:hover { background: rgba(255,255,255,0.03); }
+        .fleet-item.selected { background: rgba(232,104,49,0.08); border-left: 3px solid var(--accent); }
+        .fleet-item.status-warn { border-left: 3px solid var(--warn); }
+        .fleet-item.status-crit { border-left: 3px solid var(--crit); }
+        .fleet-item.status-ok { border-left: 3px solid transparent; }
+
+        .fleet-item-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        .line-dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .fleet-item-id {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.78rem;
             font-weight: 600;
         }
-        
-        .container { 
-            display: flex; 
-            height: calc(100vh - 70px); 
-            margin-top: 70px; 
-        }
-        
-        #canvas3d { 
-            flex: 1; 
-            position: relative; 
-            background: var(--bg-white);
-        }
-        
-        .panel { 
-            width: 400px; 
-            background: var(--bg-white); 
-            border-left: 1px solid var(--border-light); 
-            overflow-y: auto; 
-            padding: 1.5rem; 
-            box-shadow: var(--shadow-md);
-        }
-        
-        .section { 
-            background: var(--bg-white); 
-            border-radius: 12px; 
-            padding: 1.25rem; 
-            margin-bottom: 1.25rem; 
-            border: 1px solid var(--border-light); 
-            box-shadow: var(--shadow-sm);
-        }
-        
-        .section-title { 
-            font-size: 1rem; 
-            font-weight: 700; 
-            color: var(--color-primary); 
-            margin-bottom: 1rem; 
-            display: flex; 
-            align-items: center; 
-            gap: 0.5rem; 
-        }
-        
-        .vehicle-card { 
-            background: var(--bg-white); 
-            border-radius: 10px; 
-            padding: 1rem; 
-            margin-bottom: 0.75rem; 
-            border-left: 4px solid;
-            border: 1px solid var(--border-light);
-            cursor: pointer; 
-            transition: all 0.3s; 
-        }
-        
-        .vehicle-card:hover { 
-            transform: translateY(-3px); 
-            box-shadow: var(--shadow-md); 
-            border-color: var(--color-primary);
-        }
-        
-        .vehicle-card.operational { border-left-color: var(--color-success); }
-        .vehicle-card.delayed { border-left-color: var(--color-warning); }
-        .vehicle-card.maintenance { border-left-color: var(--color-danger); }
-        
-        .vehicle-header { 
-            display: flex; 
-            justify-content: space-between; 
-            margin-bottom: 0.5rem; 
-        }
-        
-        .vehicle-id { 
-            font-weight: 700; 
-            font-size: 1.1rem; 
-            color: var(--text-primary);
-        }
-        
-        .station-name { 
-            font-size: 0.8rem; 
-            color: var(--text-secondary); 
-            margin-top: 0.25rem; 
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-        }
-        
-        .status-badge { 
-            padding: 0.25rem 0.75rem; 
-            border-radius: 15px; 
-            font-size: 0.75rem; 
-            font-weight: 600; 
-        }
-        
-        .status-badge.ok { 
-            background: rgba(26, 157, 73, 0.1); 
-            color: var(--color-success); 
-        }
-        
-        .status-badge.warning { 
-            background: rgba(255, 165, 0, 0.1); 
-            color: var(--color-warning); 
-        }
-        
-        .status-badge.critical { 
-            background: rgba(227, 6, 19, 0.1); 
-            color: var(--color-danger); 
-        }
-        
-        .info-grid { 
-            display: grid; 
-            grid-template-columns: repeat(2, 1fr); 
-            gap: 0.5rem; 
-            margin-top: 0.75rem; 
-        }
-        
-        .info-item { 
-            background: var(--bg-light); 
-            border-radius: 8px; 
-            padding: 0.5rem; 
-        }
-        
-        .info-label { 
-            color: var(--text-muted); 
-            font-size: 0.7rem; 
+        .fleet-status-badge {
+            margin-left: auto;
+            font-size: 0.6rem;
+            font-family: 'JetBrains Mono', monospace;
+            padding: 2px 7px;
+            border-radius: 3px;
             text-transform: uppercase;
-            letter-spacing: 0.3px;
+            letter-spacing: 1px;
         }
-        
-        .info-value { 
-            color: var(--text-primary); 
-            font-weight: 700; 
-            font-size: 1rem; 
+        .badge-ok { background: rgba(34,197,94,0.15); color: var(--ok); }
+        .badge-warn { background: rgba(245,158,11,0.15); color: var(--warn); }
+        .badge-crit { background: rgba(239,68,68,0.15); color: var(--crit); }
+
+        .fleet-sensors {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
         }
-        
-        .controls { 
-            position: absolute; 
-            bottom: 2rem; 
-            left: 50%; 
-            transform: translateX(-50%); 
-            background: var(--bg-white); 
-            padding: 0.75rem 1.5rem; 
-            border-radius: 30px; 
-            display: flex; 
-            gap: 0.75rem; 
-            z-index: 50; 
-            border: 1px solid var(--border-light);
-            box-shadow: var(--shadow-lg);
-        }
-        
-        .control-btn { 
-            padding: 0.6rem 1.25rem; 
-            border: none; 
-            border-radius: 20px; 
-            background: var(--bg-white); 
-            color: var(--text-primary); 
-            cursor: pointer; 
-            font-weight: 600; 
-            transition: all 0.3s; 
-            display: flex; 
-            align-items: center; 
-            gap: 0.5rem; 
-            border: 1px solid var(--border-light);
-        }
-        
-        .control-btn:hover { 
-            background: var(--color-primary); 
-            color: var(--text-light);
-            border-color: var(--color-primary);
-            transform: translateY(-2px); 
-        }
-        
-        .control-btn.active { 
-            background: var(--color-primary); 
-            color: var(--text-light);
-            border-color: var(--color-primary);
-        }
-        
-        .legend { 
-            position: absolute; 
-            top: 1.5rem; 
-            left: 1.5rem; 
-            background: var(--bg-white); 
-            padding: 1rem; 
-            border-radius: 12px; 
-            border: 1px solid var(--border-light);
-            box-shadow: var(--shadow-md);
-        }
-        
-        .legend-title { 
-            font-weight: 700; 
-            margin-bottom: 0.75rem; 
-            color: var(--color-primary); 
-            font-size: 0.95rem; 
+        .sensor-chip {
+            font-size: 0.58rem;
+            font-family: 'JetBrains Mono', monospace;
+            padding: 2px 5px;
+            border-radius: 3px;
+            background: var(--bg-card);
+            color: var(--text-muted);
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 3px;
         }
-        
-        .legend-item { 
-            display: flex; 
-            align-items: center; 
-            gap: 0.5rem; 
-            font-size: 0.75rem; 
-            margin-bottom: 0.4rem; 
-            color: var(--text-secondary);
+        .sensor-chip .dot {
+            width: 5px; height: 5px; border-radius: 50%;
         }
-        
-        .legend-color { 
-            width: 16px; 
-            height: 16px; 
-            border-radius: 3px; 
+
+        /* ===== MAP ZONE ===== */
+        .map-zone {
+            position: relative;
+            overflow: hidden;
         }
-        
-        .loading { 
-            position: fixed; 
-            inset: 0; 
-            background: var(--bg-white); 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            z-index: 999; 
+
+        #leafletMap, #maplibre3D {
+            width: 100%;
+            height: 100%;
         }
-        
-        .spinner { 
-            width: 60px; 
-            height: 60px; 
-            border: 4px solid var(--bg-gray); 
-            border-top-color: var(--color-primary); 
-            border-radius: 50%; 
-            animation: spin 1s linear infinite; 
+
+        .leaflet-control-zoom { display: none; }
+        .maplibregl-ctrl-logo { display: none !important; }
+
+        /* Map toolbar */
+        .map-toolbar {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            background: var(--bg-panel);
+            padding: 6px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
         }
-        
-        @keyframes spin { 
-            to { transform: rotate(360deg); } 
+
+        .map-btn {
+            width: 36px; height: 36px;
+            border: none;
+            border-radius: 8px;
+            background: var(--bg-card);
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.82rem;
         }
-        
-        .panel::-webkit-scrollbar { 
-            width: 6px; 
+        .map-btn:hover { background: var(--accent); color: white; }
+        .map-btn.active { background: var(--accent); color: white; }
+
+        /* Map legend */
+        .map-legend {
+            position: absolute;
+            bottom: 16px;
+            left: 12px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            padding: 10px 14px;
+            border-radius: 10px;
+            z-index: 1000;
+            font-size: 0.68rem;
+            font-family: 'JetBrains Mono', monospace;
         }
-        
-        .panel::-webkit-scrollbar-track { 
-            background: var(--bg-light); 
+        .legend-title {
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
         }
-        
-        .panel::-webkit-scrollbar-thumb { 
-            background: var(--border-medium); 
-            border-radius: 3px; 
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 5px;
+            color: var(--text);
+        }
+        .legend-color {
+            width: 20px; height: 4px;
+            border-radius: 2px;
+        }
+
+        /* Loading */
+        .loading {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-dark);
+            z-index: 9999;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .loading-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            letter-spacing: 2px;
+        }
+        .loading-bar {
+            width: 200px;
+            height: 2px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .loading-bar-fill {
+            height: 100%;
+            background: var(--accent);
+            animation: loadbar 1.5s ease-in-out infinite;
+        }
+        @keyframes loadbar {
+            0% { width: 0%; margin-left: 0; }
+            50% { width: 70%; margin-left: 15%; }
+            100% { width: 0%; margin-left: 100%; }
+        }
+
+        /* ===== RIGHT PANEL — MAINTENANCE ===== */
+        .panel-right {
+            background: var(--bg-panel);
+            border-left: 1px solid var(--border);
+            overflow-y: auto;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .maintenance-header {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .maint-title {
+            font-size: 0.65rem;
+            font-family: 'JetBrains Mono', monospace;
+            letter-spacing: 2px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+        .maint-refresh-btn {
+            width: 26px; height: 26px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg-card);
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 0.7rem;
+            transition: all 0.2s;
+        }
+        .maint-refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+        /* Score global */
+        .global-health {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+        .health-score-ring {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .ring-svg { width: 64px; height: 64px; flex-shrink: 0; }
+        .ring-bg { fill: none; stroke: var(--bg-card); stroke-width: 6; }
+        .ring-fill { fill: none; stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset 1s ease; }
+
+        .health-meta { flex: 1; }
+        .health-score-val {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.5rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+        .health-score-label {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .health-sub-stats {
+            display: flex;
+            gap: 12px;
+            margin-top: 8px;
+        }
+        .hstat {
+            font-size: 0.65rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .hstat-val { font-weight: 700; }
+        .hstat-lbl { color: var(--text-muted); }
+
+        /* Alert queue */
+        .alert-queue {
+            flex: 1;
+            padding: 10px 0;
+        }
+        .alert-card {
+            margin: 0 10px 8px;
+            background: var(--bg-card);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: border-color 0.2s, transform 0.15s;
+        }
+        .alert-card:hover { transform: translateX(-3px); }
+        .alert-card.expanded { border-color: rgba(255,255,255,0.15); }
+
+        .alert-card-top {
+            padding: 10px 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .alert-severity-bar {
+            width: 3px;
+            height: 36px;
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+        .alert-main { flex: 1; min-width: 0; }
+        .alert-vehicle {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .alert-vehicle-line {
+            font-size: 0.6rem;
+            padding: 1px 5px;
+            border-radius: 3px;
+            color: white;
+            font-weight: 600;
+        }
+        .alert-component {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .alert-probability {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-align: right;
+        }
+        .alert-tta {
+            font-size: 0.58rem;
+            color: var(--text-muted);
+            text-align: right;
+        }
+        .alert-detail {
+            display: none;
+            padding: 0 12px 12px;
+            border-top: 1px solid var(--border);
+        }
+        .alert-card.expanded .alert-detail { display: block; }
+
+        .sensor-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-top: 10px;
+        }
+        .sensor-reading {
+            background: var(--bg-panel);
+            border-radius: 6px;
+            padding: 8px;
+        }
+        .sensor-reading-name {
+            font-size: 0.58rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+        .sensor-reading-val {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            font-weight: 700;
+        }
+        .sensor-reading-bar {
+            height: 3px;
+            background: var(--bg-card);
+            border-radius: 2px;
+            margin-top: 4px;
+            overflow: hidden;
+        }
+        .sensor-bar-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.8s ease;
+        }
+
+        .action-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: none;
+            font-size: 0.68rem;
+            font-family: 'Sora', sans-serif;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+            margin-top: 8px;
+        }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-primary:hover { background: #d45e24; }
+        .btn-ghost {
+            background: var(--bg-panel);
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+        }
+        .btn-ghost:hover { border-color: var(--text-muted); color: var(--text); }
+
+        /* Mini spark chart */
+        .sparkline-area {
+            margin-top: 10px;
+        }
+        .sparkline-label {
+            font-size: 0.58rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .sparkline-svg {
+            width: 100%;
+            height: 40px;
+        }
+
+        /* Timeline section */
+        .maint-timeline {
+            border-top: 1px solid var(--border);
+            padding: 12px 10px;
+        }
+        .timeline-item {
+            display: flex;
+            gap: 10px;
+            padding: 8px 6px;
+            border-radius: 6px;
+            margin-bottom: 4px;
+            transition: background 0.15s;
+            cursor: pointer;
+        }
+        .timeline-item:hover { background: rgba(255,255,255,0.03); }
+        .timeline-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            margin-top: 4px;
+            flex-shrink: 0;
+        }
+        .timeline-content { flex: 1; }
+        .timeline-title {
+            font-size: 0.68rem;
+            font-weight: 600;
+        }
+        .timeline-meta {
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            margin-top: 2px;
+        }
+        .timeline-time {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        /* Selection notification */
+        .selection-notification {
+            position: fixed;
+            top: 64px;
+            right: 340px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 10px 16px;
+            border-radius: 8px;
+            z-index: 9000;
+            font-size: 0.75rem;
+            font-family: 'JetBrains Mono', monospace;
+            animation: slideIn 0.3s ease-out;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        }
+        @keyframes slideIn {
+            from { transform: translateX(20px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* ===== TRAM MARKERS ===== */
+        .tram-marker {
+            position: relative;
+            transform-origin: center center;
+            transition: transform 0.1s linear;
+            pointer-events: all;
+            perspective: 900px; /* profondeur pour effet 3D */
+        }
+        .tram-body {
+            border: 2px solid #2c2c2c;
+            border-radius: 10px;
+            box-shadow: 0 14px 28px rgba(0,0,0,0.8), 0 6px 16px rgba(0,0,0,0.6), inset 0 1px 3px rgba(255,255,255,0.25);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            transform-style: preserve-3d;
+            /* Effet 2.5D très marqué */
+            transform: rotateX(52deg) rotateY(-18deg) scaleY(1.1);
+        }
+        .tram-body::before {
+            content: '';
+            position: absolute;
+            bottom: -8px; left: 10%; right: 10%; height: 6px;
+            background: radial-gradient(ellipse, rgba(0,0,0,0.38) 0%, transparent 75%);
+            border-radius: 50%;
+            z-index: -1;
+        }
+        /* Toit simulé pour donner du volume */
+        .tram-body::after {
+            content: '';
+            position: absolute;
+            top: -14%;
+            left: 12%;
+            right: 12%;
+            height: 26%;
+            background: linear-gradient(180deg, #0f172a 0%, #1f2933 50%, #111827 100%);
+            border-radius: 12px 12px 6px 6px;
+            transform-origin: bottom;
+            transform: rotateX(68deg) translateZ(10px);
+            box-shadow: 0 6px 10px rgba(0,0,0,0.7);
+        }
+        .tram-front {
+            position: absolute;
+            width: 100%; height: 22%; top: 0;
+            border-radius: 10px 10px 0 0;
+            background: linear-gradient(180deg, #111 0%, #222 50%, #333 100%);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .tram-front::after {
+            content: '';
+            position: absolute;
+            width: 40%; height: 55%;
+            background: linear-gradient(135deg, rgba(100,180,255,0.35) 0%, rgba(150,200,255,0.15) 100%);
+            border-radius: 3px;
+        }
+        .tram-windows {
+            position: absolute;
+            width: 92%; height: 48%; top: 24%;
+            display: flex; gap: 3%; padding: 0 2%;
+        }
+        .window {
+            flex: 1;
+            background: linear-gradient(135deg, #3a8fd4 0%, #66b3ff 35%, #99ccff 55%, #66b3ff 75%, #3a8fd4 100%);
+            border: 1px solid #222;
+            border-radius: 2px;
+            box-shadow: inset 0 1px 2px rgba(255,255,255,0.5), inset 0 -1px 1px rgba(0,0,0,0.2);
+            opacity: 0.88;
+            position: relative;
+        }
+        .window::before {
+            content: '';
+            position: absolute;
+            top: 5%; left: 10%; width: 28%; height: 35%;
+            background: linear-gradient(135deg, rgba(255,255,255,0.55) 0%, transparent 50%);
+            border-radius: 2px;
+        }
+        .tram-doors {
+            position: absolute;
+            width: 92%; height: 16%; top: 75%;
+            display: flex; gap: 15%; padding: 0 2.5%;
+            justify-content: center;
+        }
+        .door {
+            width: 14%;
+            background: linear-gradient(90deg, #444 0%, #555 50%, #444 100%);
+            border: 1px solid #1a1a1a;
+            border-radius: 2px;
+        }
+        .tram-articulation {
+            position: absolute; width: 100%; height: 7%; top: 46%;
+            background: linear-gradient(90deg, #222 0%, #111 50%, #222 100%);
+            border-top: 1px solid #444; border-bottom: 1px solid #444;
+            z-index: 3;
+        }
+        .tram-section-line {
+            position: absolute; width: 2px; height: 100%;
+            background: linear-gradient(180deg, #111 0%, #222 50%, #111 100%);
+            left: 33.33%;
+        }
+        .tram-wheels {
+            position: absolute; width: 100%; height: 100%; top: 0;
+            display: flex; justify-content: space-between; padding: 0 5%;
+        }
+        .wheel-set { position: relative; width: 10%; height: 100%; }
+        .wheel {
+            position: absolute; width: 100%; height: 11%;
+            background: radial-gradient(circle at 30% 30%, #555 0%, #2c2c2c 40%, #111 100%);
+            border-radius: 50%;
+            box-shadow: 0 3px 5px rgba(0,0,0,0.7), inset 0 1px 2px rgba(255,255,255,0.08);
+            border: 1px solid #111;
+        }
+        .wheel:first-child { top: -5%; }
+        .wheel:last-child { bottom: -5%; }
+        .tram-line-badge {
+            position: absolute; bottom: 2%; left: 50%;
+            transform: translateX(-50%);
+            padding: 3px 8px; border-radius: 4px; color: white;
+            font-weight: 700; font-size: 9px; z-index: 10;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+            letter-spacing: 1px;
+        }
+        .tram-lights {
+            position: absolute; width: 100%; height: 14%; top: 4%;
+            display: flex; justify-content: space-around; padding: 0 18%; z-index: 5;
+        }
+        .light {
+            width: 11%; aspect-ratio: 1;
+            background: radial-gradient(circle at 30% 30%, #fff9c4 0%, #ffd700 30%, #ff9800 70%, #ff6b00 100%);
+            border-radius: 50%;
+            box-shadow: 0 0 10px #ffeb3b, 0 0 5px #ffd700;
+            animation: lightPulse 2s ease-in-out infinite;
+        }
+        @keyframes lightPulse {
+            0%,100% { opacity: 1; box-shadow: 0 0 10px #ffeb3b; }
+            50% { opacity: 0.75; box-shadow: 0 0 18px #ffeb3b; }
+        }
+
+        /* Health glow on tram */
+        .tram-body.health-ok { box-shadow: 0 6px 20px rgba(0,0,0,0.6), 0 0 0 2px rgba(34,197,94,0); }
+        .tram-body.health-warn { box-shadow: 0 6px 20px rgba(245,158,11,0.4), 0 0 12px rgba(245,158,11,0.3); }
+        .tram-body.health-crit { box-shadow: 0 6px 20px rgba(239,68,68,0.5), 0 0 16px rgba(239,68,68,0.4); animation: critPulse 1.2s ease-in-out infinite; }
+        @keyframes critPulse {
+            0%,100% { box-shadow: 0 6px 20px rgba(239,68,68,0.5), 0 0 16px rgba(239,68,68,0.3); }
+            50% { box-shadow: 0 6px 20px rgba(239,68,68,0.8), 0 0 28px rgba(239,68,68,0.6); }
+        }
+
+        /* Health indicator dot on tram */
+        .tram-health-dot {
+            position: absolute; top: -8px; right: -8px;
+            width: 12px; height: 12px; border-radius: 50%;
+            border: 2px solid var(--bg-dark);
+            z-index: 20;
+        }
+
+        /* Persons entering */
+        .person-entering {
+            position: absolute; left: -45px; top: 50%;
+            transform: translateY(-50%);
+            width: 35px; height: 44px; z-index: 15;
+            animation: enterTram 4s ease-in-out infinite;
+        }
+        @keyframes enterTram {
+            0%,20% { left: -45px; opacity:1; }
+            50% { left: -8px; opacity:1; }
+            70% { left: 8px; opacity:0.4; }
+            85%,100% { left: -45px; opacity:0; }
+        }
+        .person-head { width: 10px; height: 10px; background: #ffdbac; border-radius: 50%; margin: 0 auto 2px; border: 1px solid #d4a574; }
+        .person-body { width: 16px; height: 18px; background: linear-gradient(180deg, #4a90e2 0%, #357abd 100%); margin: 0 auto; border-radius: 3px 3px 0 0; position: relative; }
+        .person-body::before, .person-body::after { content: ''; position: absolute; width: 3px; height: 12px; background: #ffdbac; border-radius: 2px; top: 2px; }
+        .person-body::before { left: -3px; transform: rotate(-10deg); }
+        .person-body::after { right: -3px; transform: rotate(10deg); }
+        .person-legs { display: flex; justify-content: center; gap: 3px; margin-top: 1px; }
+        .person-leg { width: 4px; height: 12px; background: #2c3e50; border-radius: 0 0 2px 2px; animation: walkingLegs 0.6s ease-in-out infinite; }
+        .person-leg:nth-child(2) { animation-delay: 0.3s; }
+        .person-backpack { position: absolute; width: 7px; height: 9px; background: #e74c3c; border-radius: 2px; right: -4px; top: 3px; }
+        @keyframes walkingLegs { 0%,100% { transform: translateX(0) rotate(0deg); } 50% { transform: translateX(1px) rotate(5deg); } }
+
+        /* 3D station markers */
+        .tram-3d-station-marker { width: 32px; height: 42px; transform: translate(-50%, -50%); pointer-events: auto; cursor: pointer; }
+        .station-pin { width: 16px; height: 16px; background: #4a5568; border: 2.5px solid white; border-radius: 50%; box-shadow: 0 3px 8px rgba(0,0,0,0.5); position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+        .station-person { position: absolute; left: -6px; top: -26px; width: 26px; height: 36px; }
+        .tram-3d-station-marker .person-head { width: 9px; height: 9px; }
+        .tram-3d-station-marker .person-body { width: 13px; height: 14px; background: linear-gradient(180deg, #e74c3c 0%, #c0392b 100%); }
+        .tram-3d-station-marker .person-legs { gap: 2px; }
+        .tram-3d-station-marker .person-leg { width: 4px; height: 11px; background: #2c3e50; border-radius: 0 0 2px 2px; }
+
+        .tram-3d-marker { cursor: pointer; transition: transform 0.3s ease; }
+        .tram-3d-marker:hover { transform: scale(1.1); }
+        .maplibregl-popup-content { font-family: 'Sora', sans-serif; border-radius: 8px; padding: 12px; background: var(--bg-panel); color: var(--text); }
+        .maplibregl-popup-close-button { color: var(--text-muted); font-size: 18px; }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        /* Leaflet overrides for dark mode */
+        .leaflet-popup-content-wrapper {
+            background: var(--bg-panel);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        }
+        .leaflet-popup-tip { background: var(--bg-panel); }
+        .station-popup { padding: 4px; }
+        .station-name { font-weight: 700; color: var(--accent); margin-bottom: 4px; font-size: 0.9rem; }
+        .station-info { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 3px; }
+
+        /* Anomaly overlay on map */
+        @keyframes radarPing {
+            0% { transform: scale(0.5); opacity: 0.8; }
+            100% { transform: scale(2.5); opacity: 0; }
+        }
+        .anomaly-ping {
+            position: absolute;
+            width: 30px; height: 30px;
+            border-radius: 50%;
+            border: 2px solid var(--crit);
+            animation: radarPing 1.5s ease-out infinite;
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        /* Debug panel for raw API data */
+        .debug-panel {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            z-index: 11000;
+            background: rgba(15, 23, 42, 0.96);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 0.7rem;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text);
+            max-width: 420px;
+            max-height: 45vh;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .debug-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .debug-panel-buttons {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+        .debug-btn {
+            border: 1px solid var(--border);
+            background: var(--bg-panel);
+            color: var(--text-muted);
+            border-radius: 4px;
+            padding: 3px 6px;
+            font-size: 0.65rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .debug-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .debug-output {
+            background: #020617;
+            border-radius: 4px;
+            padding: 6px;
+            color: #e5e7eb;
+            font-size: 0.65rem;
+            overflow: auto;
+            flex: 1;
+        }
+        .debug-toggle {
+            cursor: pointer;
+            color: var(--text-muted);
         }
     </style>
 </head>
+
 <body>
-    <div class="loading" id="loading">
-        <div class="spinner"></div>
-        <div style="margin-top: 1.5rem; color: var(--text-secondary);">Chargement du Digital Twin...</div>
-    </div>
-    
-    <div class="header">
-        <div class="logo">
-            <i class="fas fa-subway"></i>
-            <h1>Digital Twin 3D - RATP Dev Casablanca</h1>
-        </div>
-        <div class="stats">
-            <div><div class="stat-value" id="stat-vehicles">0</div><div class="stat-label">Véhicules</div></div>
-            <div><div class="stat-value" id="stat-passengers">0</div><div class="stat-label">Passagers</div></div>
-            <div><div class="stat-value" id="stat-delay">0</div><div class="stat-label">Retard moy.</div></div>
-        </div>
-    </div>
-    
-    <div class="container">
-        <div id="canvas3d">
-            <div class="legend">
-                <div class="legend-title"><i class="fas fa-map-signs"></i> Réseau Casablanca</div>
-                <div class="legend-item"><div class="legend-color" style="background: #FF6B35;"></div><span>T1 - Sidi Moumen ↔ Lissasfa</span></div>
-                <div class="legend-item"><div class="legend-color" style="background: #FFD93D;"></div><span>T2 - Aïn Diab ↔ Facultés</span></div>
-                <div class="legend-item"><div class="legend-color" style="background: #3B82F6;"></div><span>T3 - Hay Hassani ↔ Casa Port</span></div>
-                <div class="legend-item"><div class="legend-color" style="background: #8B5CF6;"></div><span>T4 - Lissasfa ↔ Sidi Bernoussi</span></div>
+    <script type="application/json" id="embedded-tram-geojson">
+        {{ geojson | tojson | safe }}
+    </script>
+
+    <div class="app-shell">
+        <!-- TOPBAR -->
+        <header class="topbar">
+            <div class="topbar-brand">
+                <i class="fas fa-train-tram"></i>
+                CASATRAM <span>/ Jumeau Numérique</span>
             </div>
-            
-            <div class="controls">
-                <button class="control-btn active" onclick="toggleSim()"><i class="fas fa-pause"></i><span>Pause</span></button>
-                <button class="control-btn" onclick="changeView('top')"><i class="fas fa-map"></i> Vue carte</button>
-                <button class="control-btn" onclick="changeView('angle')"><i class="fas fa-cube"></i> Vue 3D</button>
-                <button class="control-btn" onclick="resetView()"><i class="fas fa-redo"></i> Reset</button>
+            <div class="topbar-status">
+                <div class="status-dot"></div>
+                SYSTÈME OPÉRATIONNEL
             </div>
-        </div>
-        
-        <div class="panel">
-            <div class="section">
-                <div class="section-title"><i class="fas fa-train"></i> Véhicules Actifs</div>
-                <div id="vehicles-list"></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:var(--text-muted);background:var(--bg-card);padding:4px 10px;border-radius:6px;border:1px solid var(--border);">
+                <span id="live-clock">--:--:--</span>
             </div>
-            <div class="section">
-                <div class="section-title"><i class="fas fa-chart-line"></i> Santé du Réseau</div>
-                <canvas id="health-chart" height="150"></canvas>
+            <div class="topbar-kpis">
+                <div class="kpi-chip"><i class="fas fa-tram" style="color:var(--accent);font-size:0.7rem"></i><strong id="kpi-active">6</strong><span>rames actives</span></div>
+                <div class="kpi-chip"><i class="fas fa-exclamation-circle" style="color:var(--warn);font-size:0.7rem"></i><strong id="kpi-alerts">0</strong><span>alertes</span></div>
+                <div class="kpi-chip"><i class="fas fa-heartbeat" style="color:var(--ok);font-size:0.7rem"></i><strong id="kpi-health">--</strong><span>% santé flotte</span></div>
+                <div class="kpi-chip"><i class="fas fa-clock" style="color:var(--text-muted);font-size:0.7rem"></i><strong id="kpi-nextmaint">--</strong><span>prochaine maintenance</span></div>
             </div>
-        </div>
+        </header>
+
+        <!-- LEFT PANEL: FLEET STATUS -->
+        <aside class="panel-left">
+            <div class="panel-section-title"><i class="fas fa-list-ul" style="margin-right:6px;color:var(--accent)"></i>Flotte</div>
+            <div id="fleet-list"></div>
+        </aside>
+
+        <!-- MAP ZONE -->
+        <main class="map-zone">
+            <div class="map-toolbar" role="toolbar">
+                <button class="map-btn" id="toggle-3d" title="Vue 3D"><i class="fas fa-cube"></i></button>
+                <button class="map-btn" id="zoom-in" title="Zoom +"><i class="fas fa-search-plus"></i></button>
+                <button class="map-btn" id="zoom-out" title="Zoom -"><i class="fas fa-search-minus"></i></button>
+                <button class="map-btn" id="reset-map" title="Recentrer"><i class="fas fa-crosshairs"></i></button>
+                <button class="map-btn" id="toggle-alerts-map" title="Afficher alertes sur carte"><i class="fas fa-bell"></i></button>
+            </div>
+
+            <div id="leafletMap"></div>
+            <div id="maplibre3D" style="display:none;width:100%;height:100%;"></div>
+
+            <div class="loading" id="loadingOverlay">
+                <i class="fas fa-train-tram" style="font-size:2rem;color:var(--accent);margin-bottom:8px;"></i>
+                <div class="loading-text">INITIALISATION DU JUMEAU NUMÉRIQUE...</div>
+                <div class="loading-bar"><div class="loading-bar-fill"></div></div>
+            </div>
+
+            <div class="map-legend">
+                <div class="legend-title">Réseau</div>
+                <div class="legend-item"><div class="legend-color" style="background:var(--t1)"></div>Ligne T1</div>
+                <div class="legend-item"><div class="legend-color" style="background:var(--t2)"></div>Ligne T2</div>
+                <div class="legend-item"><div class="legend-color" style="background:var(--t3)"></div>Ligne T3</div>
+                <div class="legend-item"><div class="legend-color" style="background:var(--t4)"></div>Ligne T4</div>
+                <div class="legend-item"><div class="legend-color" style="background:var(--bw1)"></div>Busway BW1</div>
+                <div class="legend-item"><div class="legend-color" style="background:var(--bw2)"></div>Busway BW2</div>
+            </div>
+        </main>
+
+        <!-- RIGHT PANEL: MAINTENANCE INTELLIGENCE -->
+        <aside class="panel-right">
+            <div class="maintenance-header">
+                <div class="maint-title"><i class="fas fa-brain" style="color:var(--accent);margin-right:6px"></i>Maintenance Prédictive</div>
+                <button class="maint-refresh-btn" id="refresh-maintenance" title="Actualiser">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+
+            <!-- Global fleet health score -->
+            <div class="global-health" id="global-health-section">
+                <div class="health-score-ring">
+                    <svg class="ring-svg" viewBox="0 0 64 64">
+                        <circle class="ring-bg" cx="32" cy="32" r="27"/>
+                        <circle class="ring-fill" id="health-ring" cx="32" cy="32" r="27"
+                            stroke="#22c55e"
+                            stroke-dasharray="169.6"
+                            stroke-dashoffset="25.4"
+                            transform="rotate(-90 32 32)"/>
+                    </svg>
+                    <div class="health-meta">
+                        <div class="health-score-val" id="fleet-health-score" style="color:var(--ok)">85%</div>
+                        <div class="health-score-label">Santé Flotte</div>
+                        <div class="health-sub-stats">
+                            <div class="hstat">
+                                <span class="hstat-val" id="stat-ok" style="color:var(--ok)">0</span>
+                                <span class="hstat-lbl"> OK</span>
+                            </div>
+                            <div class="hstat">
+                                <span class="hstat-val" id="stat-warn" style="color:var(--warn)">0</span>
+                                <span class="hstat-lbl"> ⚠</span>
+                            </div>
+                            <div class="hstat">
+                                <span class="hstat-val" id="stat-crit" style="color:var(--crit)">0</span>
+                                <span class="hstat-lbl"> ✕</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alert queue -->
+            <div class="panel-section-title" style="margin:0">
+                <i class="fas fa-bell" style="margin-right:6px;color:var(--warn)"></i>
+                Alertes Prédictives — <span id="alert-count">0</span>
+            </div>
+            <div class="alert-queue" id="alert-queue"></div>
+
+            <!-- Maintenance timeline -->
+            <div class="maint-timeline">
+                <div class="panel-section-title" style="padding:0 0 8px;border:none">
+                    <i class="fas fa-calendar-alt" style="margin-right:6px;color:var(--text-muted)"></i>
+                    Prochaines Interventions
+                </div>
+                <div id="maint-timeline"></div>
+            </div>
+        </aside>
     </div>
 
+    <!-- Small debug panel to call predictive API directly -->
+    <div class="debug-panel" id="debug-panel">
+        <div class="debug-panel-header">
+            <span>API Predictive – Debug</span>
+            <span class="debug-toggle" id="debug-toggle">[−]</span>
+        </div>
+        <div class="debug-panel-buttons" id="debug-buttons">
+            <button class="debug-btn" id="btnFleet">Fleet Summary</button>
+            <button class="debug-btn" id="btnSensors">Capteurs T1-001</button>
+            <button class="debug-btn" id="btnAlerts">Alertes</button>
+        </div>
+        <pre class="debug-output" id="output">Les données s’afficheront ici…</pre>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
     <script>
-        let scene, camera, renderer, vehicles = [], isRunning = true, chart;
-        
-        const lines = {
-            T1: { 
-                color: 0xFF6B35, 
-                stations: [
-                    {name: "Sidi Moumen", x: -150, z: 150},
-                    {name: "Hay Hassani", x: -100, z: 100},
-                    {name: "Ibn Tachfine", x: -70, z: 70},
-                    {name: "Casa-Voyageurs", x: -30, z: 40},
-                    {name: "Nations-Unies", x: 0, z: 0},
-                    {name: "Mohammed V", x: 30, z: -20},
-                    {name: "Hassan II", x: 60, z: -40},
-                    {name: "Abdelmoumen", x: 90, z: -60},
-                    {name: "Facultés", x: 120, z: -80},
-                    {name: "Lissasfa", x: 150, z: -100}
-                ]
-            },
-            T2: { 
-                color: 0xFFD93D, 
-                stations: [
-                    {name: "Aïn Diab", x: -150, z: -50},
-                    {name: "Corniche", x: -110, z: -50},
-                    {name: "Anfa", x: -70, z: -50},
-                    {name: "Abdelmoumen", x: -30, z: -50},
-                    {name: "Zerktouni", x: 0, z: -50},
-                    {name: "Oasis", x: 40, z: -50},
-                    {name: "Moulay Rachid", x: 80, z: -50},
-                    {name: "Facultés", x: 120, z: -50}
-                ]
-            },
-            T3: { 
-                color: 0x3B82F6, 
-                stations: [
-                    {name: "Hay Hassani", x: -100, z: 100},
-                    {name: "Hay Mohammadi", x: -60, z: 80},
-                    {name: "Derb Sultan", x: -20, z: 60},
-                    {name: "Casa-Port", x: 20, z: 40},
-                    {name: "Roches Noires", x: 60, z: 60},
-                    {name: "Aïn Sebaâ", x: 100, z: 80}
-                ]
-            },
-            T4: { 
-                color: 0x8B5CF6, 
-                stations: [
-                    {name: "Lissasfa", x: 150, z: -100},
-                    {name: "Californie", x: 130, z: -70},
-                    {name: "Oasis", x: 100, z: -40},
-                    {name: "Hay Hassani", x: 60, z: -10},
-                    {name: "Derb Ghallef", x: 30, z: 20},
-                    {name: "Sidi Bernoussi", x: 0, z: 50},
-                    {name: "Sidi Moumen", x: -40, z: 80}
-                ]
-            }
-        };
-        
-        function init() {
-            const container = document.getElementById('canvas3d');
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0xF5F7FA); // Couleur claire RATP
-            scene.fog = new THREE.Fog(0xF5F7FA, 150, 400);
-            
-            camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 1000);
-            camera.position.set(0, 200, 150);
-            camera.lookAt(0, 0, 0);
-            
-            renderer = new THREE.WebGLRenderer({ 
-                antialias: true,
-                alpha: true 
-            });
-            renderer.setSize(container.clientWidth, container.clientHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
-            container.appendChild(renderer.domElement);
-            
-            // Lumière
-            scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            dirLight.position.set(100, 200, 100);
-            scene.add(dirLight);
-            
-            // Créer la texture SVG intégrée
-            createSVGTexture();
-            
-            // Construire le réseau de tramway
-            buildNetwork();
-            
-            // Créer les véhicules
-            createVehicles();
-            
-            // Initialiser le graphique
-            initChart();
-            
-            // Masquer l'écran de chargement et démarrer l'animation
-            setTimeout(() => {
-                document.getElementById('loading').style.display = 'none';
-                animate();
-            }, 1000);
-            
-            // Gestion du redimensionnement
-            window.addEventListener('resize', () => {
-                camera.aspect = container.clientWidth / container.clientHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(container.clientWidth, container.clientHeight);
-            });
-        }
-        
-        function createSVGTexture() {
-            // Créer un canevas pour dessiner le SVG
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = 2048;
-            canvas.height = 1152; // 2048 x 1152 (ratio 16:9)
-            
-            // Dessiner le fond blanc
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // Dessiner le contour de la carte
-            ctx.fillStyle = '#F8F9FA';
-            ctx.beginPath();
-            // Simplifier le chemin complexe du SVG en un rectangle avec quelques détails
-            ctx.rect(100, 100, canvas.width - 200, canvas.height - 200);
-            ctx.fill();
-            
-            // Dessiner les lignes principales du réseau
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            
-            // Ligne T1 (rouge/orange) - Sidi Moumen ↔ Lissasfa
-            ctx.beginPath();
-            ctx.moveTo(200, 300);
-            ctx.lineTo(400, 350);
-            ctx.lineTo(600, 400);
-            ctx.lineTo(800, 450);
-            ctx.lineTo(1000, 500);
-            ctx.lineTo(1200, 550);
-            ctx.lineTo(1400, 600);
-            ctx.lineTo(1600, 650);
-            ctx.lineTo(1800, 700);
-            ctx.strokeStyle = '#FF6B35';
-            ctx.lineWidth = 12;
-            ctx.stroke();
-            
-            // Ligne T2 (jaune) - Aïn Diab ↔ Facultés
-            ctx.beginPath();
-            ctx.moveTo(200, 800);
-            ctx.lineTo(400, 800);
-            ctx.lineTo(600, 800);
-            ctx.lineTo(800, 800);
-            ctx.lineTo(1000, 800);
-            ctx.lineTo(1200, 800);
-            ctx.lineTo(1400, 800);
-            ctx.lineTo(1600, 800);
-            ctx.strokeStyle = '#FFD93D';
-            ctx.lineWidth = 12;
-            ctx.stroke();
-            
-            // Ligne T3 (bleu) - Hay Hassani ↔ Casa Port
-            ctx.beginPath();
-            ctx.moveTo(400, 350);
-            ctx.lineTo(500, 450);
-            ctx.lineTo(600, 550);
-            ctx.lineTo(700, 650);
-            ctx.lineTo(800, 750);
-            ctx.lineTo(900, 850);
-            ctx.strokeStyle = '#3B82F6';
-            ctx.lineWidth = 12;
-            ctx.stroke();
-            
-            // Ligne T4 (violet) - Lissasfa ↔ Sidi Bernoussi
-            ctx.beginPath();
-            ctx.moveTo(1800, 700);
-            ctx.lineTo(1600, 600);
-            ctx.lineTo(1400, 500);
-            ctx.lineTo(1200, 400);
-            ctx.lineTo(1000, 300);
-            ctx.lineTo(800, 200);
-            ctx.lineTo(600, 250);
-            ctx.strokeStyle = '#8B5CF6';
-            ctx.lineWidth = 12;
-            ctx.stroke();
-            
-            // Ajouter des points pour les stations
-            const stations = [
-                {x: 200, y: 300, name: "Sidi Moumen", color: '#FF6B35'},
-                {x: 400, y: 350, name: "Hay Hassani", color: '#FF6B35'},
-                {x: 600, y: 400, name: "Ibn Tachfine", color: '#FF6B35'},
-                {x: 800, y: 450, name: "Casa-Voyageurs", color: '#FF6B35'},
-                {x: 1000, y: 500, name: "Nations-Unies", color: '#FF6B35'},
-                {x: 1200, y: 550, name: "Mohammed V", color: '#FF6B35'},
-                {x: 1400, y: 600, name: "Hassan II", color: '#FF6B35'},
-                {x: 1600, y: 650, name: "Abdelmoumen", color: '#FF6B35'},
-                {x: 1800, y: 700, name: "Lissasfa", color: '#FF6B35'},
-                
-                {x: 200, y: 800, name: "Aïn Diab", color: '#FFD93D'},
-                {x: 400, y: 800, name: "Corniche", color: '#FFD93D'},
-                {x: 600, y: 800, name: "Anfa", color: '#FFD93D'},
-                {x: 800, y: 800, name: "Abdelmoumen", color: '#FFD93D'},
-                {x: 1000, y: 800, name: "Zerktouni", color: '#FFD93D'},
-                {x: 1200, y: 800, name: "Oasis", color: '#FFD93D'},
-                {x: 1400, y: 800, name: "Moulay Rachid", color: '#FFD93D'},
-                {x: 1600, y: 800, name: "Facultés", color: '#FFD93D'},
-                
-                {x: 400, y: 350, name: "Hay Hassani", color: '#3B82F6'},
-                {x: 500, y: 450, name: "Hay Mohammadi", color: '#3B82F6'},
-                {x: 600, y: 550, name: "Derb Sultan", color: '#3B82F6'},
-                {x: 700, y: 650, name: "Casa-Port", color: '#3B82F6'},
-                {x: 800, y: 750, name: "Roches Noires", color: '#3B82F6'},
-                {x: 900, y: 850, name: "Aïn Sebaâ", color: '#3B82F6'},
-                
-                {x: 1800, y: 700, name: "Lissasfa", color: '#8B5CF6'},
-                {x: 1600, y: 600, name: "Californie", color: '#8B5CF6'},
-                {x: 1400, y: 500, name: "Oasis", color: '#8B5CF6'},
-                {x: 1200, y: 400, name: "Hay Hassani", color: '#8B5CF6'},
-                {x: 1000, y: 300, name: "Derb Ghallef", color: '#8B5CF6'},
-                {x: 800, y: 200, name: "Sidi Bernoussi", color: '#8B5CF6'},
-                {x: 600, y: 250, name: "Sidi Moumen", color: '#8B5CF6'}
-            ];
-            
-            // Dessiner les stations
-            stations.forEach(station => {
-                ctx.beginPath();
-                ctx.arc(station.x, station.y, 15, 0, Math.PI * 2);
-                ctx.fillStyle = station.color;
-                ctx.fill();
-                ctx.strokeStyle = '#FFFFFF';
-                ctx.lineWidth = 3;
-                ctx.stroke();
-                
-                // Ajouter le nom de la station (simplifié)
-                ctx.fillStyle = '#212529';
-                ctx.font = 'bold 16px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText(station.name.split(' ')[0], station.x, station.y - 25);
-            });
-            
-            // Ajouter le titre de la carte
-            ctx.fillStyle = '#0055A4';
-            ctx.font = 'bold 32px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText('Réseau Tramway Casablanca', canvas.width/2, 50);
-            
-            // Ajouter la mention RATP DEV
-            ctx.fillStyle = '#1A9D49';
-            ctx.font = '600 18px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText('RATP DEV • Digital Twin', canvas.width/2, canvas.height - 40);
-            
-            // Créer la texture à partir du canevas
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.wrapS = THREE.RepeatWrapping;
-            texture.wrapT = THREE.RepeatWrapping;
-            texture.repeat.set(1, 1);
-            
-            // Créer le sol avec la texture
-            const groundGeo = new THREE.PlaneGeometry(400, 225); // Ratio 16:9
-            const groundMat = new THREE.MeshStandardMaterial({ 
-                map: texture,
-                side: THREE.DoubleSide
-            });
-            
-            const ground = new THREE.Mesh(groundGeo, groundMat);
-            ground.rotation.x = -Math.PI / 2;
-            ground.position.y = 0;
-            scene.add(ground);
-            
-            
-        }
-        
-        function buildNetwork() {
-            Object.entries(lines).forEach(([id, data]) => {
-                // Créer les rails
-                const points = data.stations.map(s => new THREE.Vector3(s.x, 0.5, s.z));
-                const curve = new THREE.CatmullRomCurve3(points);
-                const trackGeo = new THREE.TubeGeometry(curve, 200, 0.6, 16, false);
-                const track = new THREE.Mesh(trackGeo, new THREE.MeshStandardMaterial({ 
-                    color: data.color, 
-                    emissive: data.color, 
-                    emissiveIntensity: 0.4 
-                }));
-                scene.add(track);
-                
-                // Créer les stations
-                data.stations.forEach(s => {
-                    // Plateforme de la station
-                    const station = new THREE.Mesh(
-                        new THREE.CylinderGeometry(2, 2, 0.4, 16),
-                        new THREE.MeshStandardMaterial({ color: 0x6C757D }) // Gris RATP
-                    );
-                    station.position.set(s.x, 0.2, s.z);
-                    scene.add(station);
-                    
-                    // Poteau indicateur
-                    const marker = new THREE.Mesh(
-                        new THREE.CylinderGeometry(0.3, 0.3, 5, 8),
-                        new THREE.MeshStandardMaterial({ 
-                            color: data.color, 
-                            emissive: data.color, 
-                            emissiveIntensity: 0.8 
-                        })
-                    );
-                    marker.position.set(s.x, 2.5, s.z);
-                    scene.add(marker);
-                    
-                    // Lumière au sommet
-                    const light = new THREE.Mesh(
-                        new THREE.SphereGeometry(0.5, 8, 8),
-                        new THREE.MeshBasicMaterial({ color: data.color })
-                    );
-                    light.position.set(s.x, 5, s.z);
-                    scene.add(light);
-                });
-            });
-        }
-        
-        function createVehicles() {
-            let id = 1;
-            Object.entries(lines).forEach(([lineId, data]) => {
-                const count = lineId === 'T1' ? 8 : 6;
-                for (let i = 0; i < count; i++) {
-                    const vehicle = createVehicle(data.color);
-                    const stationIdx = Math.floor((i / count) * data.stations.length);
-                    const s = data.stations[stationIdx];
-                    vehicle.position.set(s.x, 1.2, s.z);
-                    
-                    vehicle.userData = {
-                        id: `${lineId}-${String(id++).padStart(3, '0')}`,
-                        line: lineId,
-                        currentIdx: stationIdx,
-                        targetIdx: (stationIdx + 1) % data.stations.length,
-                        progress: Math.random(),
-                        speed: 0.002 + Math.random() * 0.0015,
-                        passengers: Math.floor(Math.random() * 280),
-                        delay: Math.random() * 5,
-                        status: Math.random() > 0.9 ? 'maintenance' : Math.random() > 0.8 ? 'delayed' : 'operational',
-                        health: 70 + Math.random() * 30,
-                        currentStation: data.stations[stationIdx].name
-                    };
-                    
-                    scene.add(vehicle);
-                    vehicles.push(vehicle);
-                }
-            });
-            updateVehiclesList();
-        }
-        
-        function createVehicle(color) {
-            const group = new THREE.Group();
-            
-            // Corps du véhicule
-            const body = new THREE.Mesh(
-                new THREE.BoxGeometry(2.2, 1.8, 4.5),
-                new THREE.MeshStandardMaterial({ 
-                    color: color, 
-                    metalness: 0.8, 
-                    roughness: 0.2 
-                })
-            );
-            body.position.y = 0.9;
-            group.add(body);
-            
-            // Fenêtres
-            for (let i = 0; i < 3; i++) {
-                const win = new THREE.Mesh(
-                    new THREE.BoxGeometry(2.1, 0.7, 1),
-                    new THREE.MeshStandardMaterial({ 
-                        color: 0x87CEEB, 
-                        transparent: true, 
-                        opacity: 0.7 
-                    })
-                );
-                win.position.set(0, 1.5, -1.5 + i * 1.5);
-                group.add(win);
-            }
-            
-            // Roues
-            [[-0.7, 0.35, -1.5], [0.7, 0.35, -1.5], 
-             [-0.7, 0.35, 1.5], [0.7, 0.35, 1.5]].forEach(pos => {
-                const wheel = new THREE.Mesh(
-                    new THREE.CylinderGeometry(0.35, 0.35, 0.25, 16),
-                    new THREE.MeshStandardMaterial({ color: 0x333333 }) // Noir
-                );
-                wheel.rotation.z = Math.PI / 2;
-                wheel.position.set(pos[0], pos[1], pos[2]);
-                group.add(wheel);
-            });
-            
-            return group;
-        }
-        
-        function animate() {
-            requestAnimationFrame(animate);
-            
-            if (isRunning) {
-                // Animer les véhicules
-                vehicles.forEach(v => {
-                    const d = v.userData;
-                    const lineData = lines[d.line];
-                    const current = lineData.stations[d.currentIdx];
-                    const target = lineData.stations[d.targetIdx];
-                    
-                    d.progress += d.speed;
-                    
-                    if (d.progress >= 1) {
-                        d.progress = 0;
-                        d.currentIdx = d.targetIdx;
-                        d.targetIdx = (d.targetIdx + 1) % lineData.stations.length;
-                        d.passengers = Math.max(0, Math.min(280, d.passengers + Math.floor(Math.random() * 40 - 20)));
-                        d.currentStation = lineData.stations[d.currentIdx].name;
-                    }
-                    
-                    // Déplacement entre stations
-                    v.position.x = current.x + (target.x - current.x) * d.progress;
-                    v.position.z = current.z + (target.z - current.z) * d.progress;
-                    
-                    // Orientation
-                    const angle = Math.atan2(target.z - current.z, target.x - current.x);
-                    v.rotation.y = -angle + Math.PI / 2;
-                });
-                
-                // Mettre à jour l'interface périodiquement
-                if (Date.now() % 2000 < 16) {
-                    updateVehiclesList();
-                    updateStats();
-                }
-            }
-            
-            renderer.render(scene, camera);
-        }
-        
-        function updateVehiclesList() {
-            const container = document.getElementById('vehicles-list');
-            container.innerHTML = '';
-            
-            vehicles.slice(0, 8).forEach(v => {
-                const d = v.userData;
-                const card = document.createElement('div');
-                card.className = `vehicle-card ${d.status}`;
-                
-                const healthColor = d.health > 80 ? '#1A9D49' : d.health > 60 ? '#FFA500' : '#E30613';
-                
-                card.innerHTML = `
-                    <div class="vehicle-header">
-                        <div>
-                            <div class="vehicle-id">${d.id}</div>
-                            <div class="station-name">📍 ${d.currentStation}</div>
-                        </div>
-                        <div class="status-badge ${d.status === 'operational' ? 'ok' : d.status === 'delayed' ? 'warning' : 'critical'}">
-                            ${d.status === 'operational' ? '🟢' : d.status === 'delayed' ? '🟡' : '🔴'}
-                        </div>
-                    </div>
-                    <div class="info-grid">
-                        <div class="info-item"><div class="info-label">Passagers</div><div class="info-value">${d.passengers}/280</div></div>
-                        <div class="info-item"><div class="info-label">Retard</div><div class="info-value">${d.delay.toFixed(1)} min</div></div>
-                        <div class="info-item"><div class="info-label">Santé</div><div class="info-value" style="color: ${healthColor}">${d.health.toFixed(0)}%</div></div>
-                        <div class="info-item"><div class="info-label">Ligne</div><div class="info-value">${d.line}</div></div>
-                    </div>
-                `;
-                
-                container.appendChild(card);
-            });
-        }
-        
-        function updateStats() {
-            const totalPass = vehicles.reduce((sum, v) => sum + v.userData.passengers, 0);
-            const avgDelay = vehicles.reduce((sum, v) => sum + v.userData.delay, 0) / vehicles.length;
-            
-            document.getElementById('stat-vehicles').textContent = vehicles.length;
-            document.getElementById('stat-passengers').textContent = Math.floor(totalPass / 100) * 100;
-            document.getElementById('stat-delay').textContent = avgDelay.toFixed(1) + ' min';
-        }
-        
-        function initChart() {
-            const ctx = document.getElementById('health-chart').getContext('2d');
-            chart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: ['6h', '8h', '10h', '12h', '14h', '16h', '18h', '20h'],
-                    datasets: [{
-                        label: 'Santé Moyenne',
-                        data: [92, 90, 88, 85, 87, 84, 82, 81],
-                        borderColor: '#1A9D49',
-                        backgroundColor: 'rgba(26, 157, 73, 0.1)',
-                        tension: 0.4,
-                        fill: true,
-                        borderWidth: 2
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
-                    scales: {
-                        x: {
-                            grid: { 
-                                color: 'rgba(0, 0, 0, 0.05)',
-                                drawBorder: false
-                            },
-                            ticks: { 
-                                color: '#6C757D',
-                                font: {
-                                    size: 11
-                                }
-                            }
-                        },
-                        y: {
-                            grid: { 
-                                color: 'rgba(0, 0, 0, 0.05)',
-                                drawBorder: false
-                            },
-                            ticks: { 
-                                color: '#6C757D',
-                                font: {
-                                    size: 11
-                                },
-                                callback: function(value) {
-                                    return value + '%';
-                                }
-                            },
-                            min: 70,
-                            max: 100
-                        }
-                    },
-                    elements: {
-                        point: {
-                            radius: 3,
-                            hoverRadius: 6,
-                            backgroundColor: '#1A9D49'
-                        }
-                    }
-                }
-            });
-        }
-        
-        function toggleSim() {
-            isRunning = !isRunning;
-            const btn = document.querySelector('.control-btn');
-            btn.classList.toggle('active');
-            btn.innerHTML = isRunning ? 
-                '<i class="fas fa-pause"></i><span>Pause</span>' : 
-                '<i class="fas fa-play"></i><span>Play</span>';
-        }
-        
-        function changeView(mode) {
-            if (mode === 'top') {
-                camera.position.set(0, 250, 0);
-                camera.lookAt(0, 0, 0);
+    // ====================================================
+    // CONFIGURATION
+    // ====================================================
+    const tramLines = [
+        { id: 'T1', name: 'T1', color: '#E86831' },
+        { id: 'T2', name: 'T2', color: '#F2CB07' },
+        { id: 'T3', name: 'T3', color: '#D9328E' },
+        { id: 'T4', name: 'T4', color: '#003DA5' },
+        { id: 'BW1', name: 'Busway 1', color: '#00843D' },
+        { id: 'BW2', name: 'Busway 2', color: '#00A3E0' }
+    ];
+    // Backend API (predictive maintenance engine based on MetroPT / Casablanca adaptation)
+    const PRED_API_BASE = 'http://localhost:5001';
+
+    // ====================================================
+    // PREDICTIVE MAINTENANCE DATA ENGINE
+    // ====================================================
+    const COMPONENTS = ['Bogies', 'Pantographe', 'Système de freinage', 'Motorisation', 'Climatisation', 'Portes', 'Électronique embarquée', 'Rail de collecte'];
+    const SENSOR_TYPES = [
+        { key: 'vibration', label: 'VIBRATION', unit: 'mm/s', normal: [0,3], warn: [3,7], crit: [7,15] },
+        { key: 'temp', label: 'TEMP MOTEUR', unit: '°C', normal: [20,70], warn: [70,90], crit: [90,120] },
+        { key: 'current', label: 'COURANT', unit: 'A', normal: [100,300], warn: [300,400], crit: [400,500] },
+        { key: 'brake', label: 'FREINAGE', unit: '%', normal: [80,100], warn: [60,80], crit: [0,60] },
+        { key: 'panto', label: 'PANTOGRAPHE', unit: 'kN', normal: [0.08,0.12], warn: [0.06,0.08], crit: [0,0.06] },
+        { key: 'wear', label: 'USURE', unit: '%', normal: [0,40], warn: [40,70], crit: [70,100] }
+    ];
+
+    let fleetData = {};
+    let selectedTramId = null;
+
+    function rnd(min, max) { return min + Math.random() * (max - min); }
+    function rndInt(min, max) { return Math.floor(rnd(min, max+1)); }
+
+    // Frontend fallback simulator (used only if predictive backend is unavailable)
+    function generateFleetData() {
+        fleetData = {};
+        tramLines.forEach((line, i) => {
+            const rand = Math.random();
+            let status, healthScore;
+            if (i === 0 && Math.random() < 0.5) {
+                status = 'crit';
+                healthScore = rndInt(30, 55);
+            } else if (rand < 0.3) {
+                status = 'warn';
+                healthScore = rndInt(55, 78);
+            } else if (rand < 0.15) {
+                status = 'crit';
+                healthScore = rndInt(25, 54);
             } else {
-                camera.position.set(150, 120, 150);
-                camera.lookAt(0, 0, 0);
+                status = 'ok';
+                healthScore = rndInt(78, 98);
             }
+
+            const sensorReadings = {};
+            SENSOR_TYPES.forEach(st => {
+                let val;
+                if (status === 'crit') {
+                    val = rnd(st.crit[0], st.crit[1]);
+                } else if (status === 'warn') {
+                    val = rnd(st.warn[0], st.warn[1]);
+                } else {
+                    val = rnd(st.normal[0], st.normal[1]);
+                }
+                sensorReadings[st.key] = parseFloat(val.toFixed(2));
+            });
+
+            const numAlerts = status === 'crit' ? rndInt(2,4) : status === 'warn' ? rndInt(1,2) : 0;
+            const alerts = [];
+            const shuffledComp = [...COMPONENTS].sort(() => Math.random()-0.5);
+            for (let a = 0; a < numAlerts; a++) {
+                const prob = status === 'crit' ? rndInt(72,97) : rndInt(45,71);
+                const daysToFailure = status === 'crit' ? rndInt(1,7) : rndInt(8,30);
+                alerts.push({
+                    component: shuffledComp[a] || COMPONENTS[a % COMPONENTS.length],
+                    probability: prob,
+                    daysToFailure,
+                    recommendation: status === 'crit'
+                        ? 'Mise hors service immédiate requise'
+                        : 'Inspection préventive à planifier sous 7 jours'
+                });
+            }
+
+            const sparkData = generateSparkline(status, healthScore);
+            const lastMaint = new Date();
+            lastMaint.setDate(lastMaint.getDate() - rndInt(10, 90));
+            const nextMaint = new Date();
+            nextMaint.setDate(nextMaint.getDate() + rndInt(1, 45));
+
+            fleetData[line.id] = {
+                lineId: line.id,
+                lineColor: line.color,
+                status,
+                healthScore,
+                sensorReadings,
+                alerts,
+                sparkData,
+                lastMaint: lastMaint.toLocaleDateString('fr-FR'),
+                nextMaint: nextMaint.toLocaleDateString('fr-FR'),
+                nextMaintDays: rndInt(1,45),
+                km: rndInt(45000, 180000),
+                model: 'Alstom Citadis X05'
+            };
+        });
+        return fleetData;
+    }
+
+    function generateSparkline(status, score) {
+        const points = [];
+        let val = score;
+        for (let i = 0; i < 24; i++) {
+            const drift = status === 'crit' ? -1.5 : status === 'warn' ? -0.5 : (Math.random()-0.4)*1.5;
+            val = Math.max(10, Math.min(100, val + drift + (Math.random()-0.5)*3));
+            points.push(parseFloat(val.toFixed(1)));
         }
-        
-        function resetView() {
-            camera.position.set(0, 200, 150);
-            camera.lookAt(0, 0, 0);
+        return points;
+    }
+
+    // Map backend component codes to human‑readable French labels
+    function mapComponentCode(componentCode) {
+        switch (componentCode) {
+            case 'APU': return 'Unité de production d’air (APU)';
+            case 'BRAKES': return 'Système de freinage';
+            case 'DOORS': return 'Système de portes';
+            case 'TRACTION': return 'Motorisation / traction';
+            case 'HVAC': return 'Climatisation / HVAC';
+            case 'PANTOGRAPH': return 'Pantographe';
+            case 'SUSPENSION': return 'Suspension';
+            case 'BATTERY': return 'Batterie de bord';
+            default: return componentCode || 'Composant';
         }
-        
-        window.addEventListener('DOMContentLoaded', init);
+    }
+
+    // Convert backend prediction to frontend alert object
+    function buildAlertFromPrediction(pred) {
+        const probability = Math.round((pred.failure_probability || 0) * 100);
+        const hours = pred.time_to_failure_hours;
+        const daysToFailure = hours
+            ? Math.max(1, Math.round(hours / 24))
+            : (probability >= 70 ? 1 : 7);
+        const componentLabel = mapComponentCode(pred.component);
+        const recommendation = pred.recommendation || (
+            probability >= 70
+                ? 'Mise hors service immédiate requise'
+                : 'Inspection préventive à planifier sous 7 jours'
+        );
+        return {
+            component: componentLabel,
+            probability,
+            daysToFailure,
+            recommendation,
+            _raw: pred
+        };
+    }
+
+    // Load real predictive maintenance data from backend (MetroPT‑style engine)
+    async function loadPredictiveData() {
+        // Only tram lines T1‑T4 are covered by the predictive engine
+        const linesToLoad = tramLines.filter(l => ['T1','T2','T3','T4'].includes(l.id));
+
+        const linePromises = linesToLoad.map(line =>
+            fetch(`${PRED_API_BASE}/api/line/${line.id}/health`).then(r => r.json())
+        );
+
+        const [fleetSummaryResp, ...lineResponses] = await Promise.all([
+            fetch(`${PRED_API_BASE}/api/fleet/summary`).then(r => r.json()),
+            ...linePromises
+        ]);
+
+        fleetData = {};
+
+        linesToLoad.forEach((line, idx) => {
+            const res = lineResponses[idx];
+            if (!res || !res.success || !res.data) return;
+            const d = res.data;
+
+            const alerts = [];
+            (d.predictions?.critical || []).forEach(p => alerts.push(buildAlertFromPrediction(p)));
+            (d.predictions?.warning || []).forEach(p => alerts.push(buildAlertFromPrediction(p)));
+
+            const status = d.critical_count > 0 ? 'crit' : (d.warning_count > 0 ? 'warn' : 'ok');
+            const healthScore = Math.round(d.line_health_score || 0);
+            const sparkData = generateSparkline(status, healthScore || 80);
+
+            let nextMaintDays = 30;
+            if (alerts.length) {
+                nextMaintDays = Math.min(...alerts.map(a => a.daysToFailure || 30));
+            }
+            const now = new Date();
+            const nextDate = new Date(now.getTime() + nextMaintDays * 24 * 3600 * 1000);
+            const lastDate = new Date(now.getTime() - 14 * 24 * 3600 * 1000);
+
+            const sensorReadings = {};
+            // We don’t have raw sensor channels per line; approximate ranges per status
+            SENSOR_TYPES.forEach(st => {
+                let val;
+                if (status === 'crit') val = rnd(st.crit[0], st.crit[1]);
+                else if (status === 'warn') val = rnd(st.warn[0], st.warn[1]);
+                else val = rnd(st.normal[0], st.normal[1]);
+                sensorReadings[st.key] = parseFloat(val.toFixed(2));
+            });
+
+            fleetData[line.id] = {
+                lineId: line.id,
+                lineColor: line.color,
+                status,
+                healthScore,
+                sensorReadings,
+                alerts,
+                sparkData,
+                lastMaint: lastDate.toLocaleDateString('fr-FR'),
+                nextMaint: nextDate.toLocaleDateString('fr-FR'),
+                nextMaintDays,
+                km: rndInt(45000, 180000),
+                model: 'Alstom Citadis X05'
+            };
+        });
+
+        // Simple synthetic data for busways (no predictive model yet)
+        tramLines.filter(l => l.id.startsWith('BW')).forEach(line => {
+            if (!fleetData[line.id]) {
+                const status = 'ok';
+                const healthScore = rndInt(80, 97);
+                const sensorReadings = {};
+                SENSOR_TYPES.forEach(st => {
+                    const val = rnd(st.normal[0], st.normal[1]);
+                    sensorReadings[st.key] = parseFloat(val.toFixed(2));
+                });
+                const sparkData = generateSparkline(status, healthScore);
+                const now = new Date();
+                const nextDate = new Date(now.getTime() + 21 * 24 * 3600 * 1000);
+                const lastDate = new Date(now.getTime() - 30 * 24 * 3600 * 1000);
+                fleetData[line.id] = {
+                    lineId: line.id,
+                    lineColor: line.color,
+                    status,
+                    healthScore,
+                    sensorReadings,
+                    alerts: [],
+                    sparkData,
+                    lastMaint: lastDate.toLocaleDateString('fr-FR'),
+                    nextMaint: nextDate.toLocaleDateString('fr-FR'),
+                    nextMaintDays: 21,
+                    km: rndInt(30000, 120000),
+                    model: 'Busway'
+                };
+            }
+        });
+
+        return fleetSummaryResp;
+    }
+
+    function getSensorStatus(sensorType, value) {
+        const { normal, warn, crit } = sensorType;
+        if (sensorType.key === 'brake' || sensorType.key === 'panto') {
+            if (value <= crit[1]) return 'crit';
+            if (value <= warn[1]) return 'warn';
+            return 'ok';
+        }
+        if (value >= crit[0]) return 'crit';
+        if (value >= warn[0]) return 'warn';
+        return 'ok';
+    }
+
+    function getSensorNormalizedValue(sensorType, value) {
+        const max = sensorType.crit[1] || sensorType.normal[1] * 1.5;
+        const min = sensorType.crit[0] || 0;
+        if (sensorType.key === 'brake' || sensorType.key === 'panto') {
+            return 1 - Math.min(1, Math.max(0, (value - min) / (max - min)));
+        }
+        return Math.min(1, Math.max(0, (value - min) / (max - min)));
+    }
+
+    const statusColor = { ok: '#22c55e', warn: '#f59e0b', crit: '#ef4444' };
+
+    // ====================================================
+    // FLEET LIST PANEL
+    // ====================================================
+    function renderFleetList() {
+        const container = document.getElementById('fleet-list');
+        container.innerHTML = '';
+        let okCount = 0, warnCount = 0, critCount = 0;
+        let totalHealth = 0;
+
+        Object.values(fleetData).forEach(tram => {
+            if (tram.status === 'ok') okCount++;
+            else if (tram.status === 'warn') warnCount++;
+            else critCount++;
+            totalHealth += tram.healthScore;
+
+            const sensorChips = SENSOR_TYPES.slice(0,4).map(st => {
+                const val = tram.sensorReadings[st.key];
+                const sts = getSensorStatus(st, val);
+                return `<span class="sensor-chip"><span class="dot" style="background:${statusColor[sts]}"></span>${st.label.split(' ')[0]}</span>`;
+            }).join('');
+
+            const item = document.createElement('div');
+            item.className = `fleet-item status-${tram.status}${selectedTramId === tram.lineId ? ' selected' : ''}`;
+            item.dataset.lineId = tram.lineId;
+            item.innerHTML = `
+                <div class="fleet-item-header">
+                    <div class="line-dot" style="background:${tram.lineColor}"></div>
+                    <div class="fleet-item-id">${tram.lineId}</div>
+                    <div class="fleet-status-badge badge-${tram.status}">${tram.status === 'ok' ? 'NOMINAL' : tram.status === 'warn' ? 'DÉGRADÉ' : 'CRITIQUE'}</div>
+                </div>
+                <div class="fleet-sensors">${sensorChips}
+                    <span class="sensor-chip" style="color:${statusColor[tram.status]};font-weight:700">${tram.healthScore}%</span>
+                </div>
+            `;
+            item.addEventListener('click', () => {
+                selectedTramId = tram.lineId;
+                renderFleetList();
+                focusTramOnMap(tram.lineId);
+                renderAlertQueue();
+            });
+            container.appendChild(item);
+        });
+
+        // Update KPIs
+        const avgHealth = Math.round(totalHealth / tramLines.length);
+        document.getElementById('kpi-active').textContent = Object.keys(fleetData).length;
+        document.getElementById('kpi-health').textContent = avgHealth;
+        document.getElementById('kpi-alerts').textContent = warnCount + critCount;
+        document.getElementById('stat-ok').textContent = okCount;
+        document.getElementById('stat-warn').textContent = warnCount;
+        document.getElementById('stat-crit').textContent = critCount;
+        document.getElementById('fleet-health-score').textContent = avgHealth + '%';
+        document.getElementById('fleet-health-score').style.color = avgHealth >= 75 ? 'var(--ok)' : avgHealth >= 55 ? 'var(--warn)' : 'var(--crit)';
+
+        // Update health ring
+        const ring = document.getElementById('health-ring');
+        const circumference = 169.6;
+        const offset = circumference - (avgHealth/100) * circumference;
+        ring.style.strokeDashoffset = offset;
+        ring.style.stroke = avgHealth >= 75 ? '#22c55e' : avgHealth >= 55 ? '#f59e0b' : '#ef4444';
+
+        // Next maintenance KPI
+        const nextMaintDays = Math.min(...Object.values(fleetData).map(t => t.nextMaintDays));
+        document.getElementById('kpi-nextmaint').textContent = `J-${nextMaintDays}`;
+    }
+
+    // ====================================================
+    // ALERT QUEUE PANEL
+    // ====================================================
+    function renderAlertQueue() {
+        const container = document.getElementById('alert-queue');
+        container.innerHTML = '';
+        let allAlerts = [];
+
+        const sourceData = selectedTramId
+            ? { [selectedTramId]: fleetData[selectedTramId] }
+            : fleetData;
+
+        Object.values(sourceData).forEach(tram => {
+            if (!tram) return;
+            tram.alerts.forEach(alert => {
+                allAlerts.push({ ...alert, tram });
+            });
+        });
+
+        // Sort by probability desc
+        allAlerts.sort((a, b) => b.probability - a.probability);
+        document.getElementById('alert-count').textContent = allAlerts.length;
+
+        if (allAlerts.length === 0) {
+            container.innerHTML = `<div style="padding:24px 16px;text-align:center;color:var(--text-muted);font-size:0.72rem;font-family:'JetBrains Mono',monospace;">
+                <i class="fas fa-check-circle" style="color:var(--ok);font-size:1.5rem;display:block;margin-bottom:8px"></i>
+                Aucune alerte${selectedTramId ? ` pour ${selectedTramId}` : ''}
+            </div>`;
+            return;
+        }
+
+        allAlerts.forEach((alert, idx) => {
+            const { tram } = alert;
+            const isCrit = alert.probability >= 70;
+
+            const card = document.createElement('div');
+            card.className = 'alert-card';
+            card.dataset.idx = idx;
+
+            // Sensor readings for this alert
+            const sensorRows = SENSOR_TYPES.map(st => {
+                const val = tram.sensorReadings[st.key];
+                const sts = getSensorStatus(st, val);
+                const norm = getSensorNormalizedValue(st, val);
+                return `
+                <div class="sensor-reading">
+                    <div class="sensor-reading-name">${st.label}</div>
+                    <div class="sensor-reading-val" style="color:${statusColor[sts]}">${val} ${st.unit}</div>
+                    <div class="sensor-reading-bar">
+                        <div class="sensor-bar-fill" style="width:${Math.round(norm*100)}%;background:${statusColor[sts]}"></div>
+                    </div>
+                </div>`;
+            }).join('');
+
+            // Spark line SVG
+            const spark = tram.sparkData;
+            const h = 40, w = 290;
+            const minV = Math.min(...spark), maxV = Math.max(...spark);
+            const pts = spark.map((v,i) => {
+                const x = (i/(spark.length-1))*w;
+                const y = h - ((v - minV)/(maxV - minV || 1)) * (h-4) - 2;
+                return `${x},${y}`;
+            }).join(' ');
+
+            card.innerHTML = `
+                <div class="alert-card-top">
+                    <div class="alert-severity-bar" style="background:${isCrit ? 'var(--crit)' : 'var(--warn)'}"></div>
+                    <div class="alert-main">
+                        <div class="alert-vehicle">
+                            <span class="alert-vehicle-line" style="background:${tram.lineColor}">${tram.lineId}</span>
+                            ${tram.model}
+                        </div>
+                        <div class="alert-component"><i class="fas fa-wrench" style="font-size:0.6rem;margin-right:3px"></i>${alert.component}</div>
+                    </div>
+                    <div>
+                        <div class="alert-probability" style="color:${isCrit ? 'var(--crit)' : 'var(--warn)'}">${alert.probability}%</div>
+                        <div class="alert-tta">J-${alert.daysToFailure}</div>
+                    </div>
+                </div>
+                <div class="alert-detail">
+                    <div style="font-size:0.65rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace;padding:8px 0 6px;border-bottom:1px solid var(--border);margin-bottom:8px">
+                        <i class="fas fa-robot" style="margin-right:4px;color:var(--accent2)"></i>
+                        ${alert.recommendation}
+                    </div>
+                    <div class="sensor-grid">${sensorRows}</div>
+                    <div class="sparkline-area">
+                        <div class="sparkline-label">Évolution santé — 24h</div>
+                        <svg class="sparkline-svg" viewBox="0 0 290 40" preserveAspectRatio="none">
+                            <polyline points="${pts}" fill="none" stroke="${isCrit ? '#ef4444' : '#f59e0b'}" stroke-width="1.5" stroke-linecap="round"/>
+                            <polyline points="${pts}" fill="none" stroke="rgba(${isCrit ? '239,68,68' : '245,158,11'},0.2)" stroke-width="8"/>
+                        </svg>
+                    </div>
+                    <button class="action-btn btn-primary" onclick="planMaintenance('${tram.lineId}', '${alert.component.replace(/'/g,"\\'")}')">
+                        <i class="fas fa-calendar-plus"></i> Planifier intervention
+                    </button>
+                    <button class="action-btn btn-ghost" onclick="focusTramOnMap('${tram.lineId}')">
+                        <i class="fas fa-map-marker-alt"></i> Localiser sur carte
+                    </button>
+                </div>
+            `;
+
+            card.querySelector('.alert-card-top').addEventListener('click', () => {
+                const wasExpanded = card.classList.contains('expanded');
+                container.querySelectorAll('.alert-card.expanded').forEach(c => c.classList.remove('expanded'));
+                if (!wasExpanded) card.classList.add('expanded');
+            });
+
+            container.appendChild(card);
+        });
+    }
+
+    // ====================================================
+    // MAINTENANCE TIMELINE
+    // ====================================================
+    function renderMaintenanceTimeline() {
+        const container = document.getElementById('maint-timeline');
+        container.innerHTML = '';
+
+        const events = [];
+        Object.values(fleetData).forEach(tram => {
+            events.push({
+                lineId: tram.lineId,
+                lineColor: tram.lineColor,
+                daysAway: tram.nextMaintDays,
+                date: tram.nextMaint,
+                type: tram.status === 'crit' ? 'Intervention urgente' : tram.status === 'warn' ? 'Inspection préventive' : 'Maintenance programmée',
+                status: tram.status
+            });
+        });
+        events.sort((a,b) => a.daysAway - b.daysAway);
+
+        events.slice(0, 6).forEach(ev => {
+            const item = document.createElement('div');
+            item.className = 'timeline-item';
+            item.innerHTML = `
+                <div class="timeline-dot" style="background:${statusColor[ev.status]}"></div>
+                <div class="timeline-content">
+                    <div class="timeline-title">
+                        <span style="background:${ev.lineColor};color:white;padding:1px 5px;border-radius:3px;font-size:0.6rem;margin-right:5px">${ev.lineId}</span>
+                        ${ev.type}
+                    </div>
+                    <div class="timeline-meta">${ev.date}</div>
+                </div>
+                <div class="timeline-time">J-${ev.daysAway}</div>
+            `;
+            container.appendChild(item);
+        });
+    }
+
+    // ====================================================
+    // ACTIONS
+    // ====================================================
+    function planMaintenance(lineId, component) {
+        showNotification(`✓ Intervention planifiée : ${lineId} — ${component}`);
+    }
+
+    function focusTramOnMap(lineId) {
+        selectedTramId = lineId;
+        renderFleetList();
+        if (tramMarkers[lineId] && map) {
+            const pos = tramMarkers[lineId].marker.getLatLng();
+            map.setView(pos, Math.max(map.getZoom(), 15));
+            tramMarkers[lineId].marker.openPopup();
+        }
+        if (is3DMode && tram3DMarkers[lineId] && maplibreMap) {
+            const lngLat = tram3DMarkers[lineId].getLngLat();
+            maplibreMap.flyTo({ center: lngLat, zoom: 15, duration: 800 });
+        }
+        showNotification(`🔍 Localisation ${lineId} sur carte`);
+    }
+
+    // ====================================================
+    // LIVE CLOCK
+    // ====================================================
+    function updateClock() {
+        const now = new Date();
+        document.getElementById('live-clock').textContent = now.toLocaleTimeString('fr-FR');
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // ====================================================
+    // NOTIFICATION
+    // ====================================================
+    function showNotification(msg) {
+        document.querySelectorAll('.selection-notification').forEach(n => n.remove());
+        const n = document.createElement('div');
+        n.className = 'selection-notification';
+        n.innerHTML = msg;
+        document.body.appendChild(n);
+        setTimeout(() => { n.style.opacity = '0'; n.style.transition = 'opacity 0.3s'; setTimeout(() => n.remove(), 300); }, 3000);
+    }
+
+    // ====================================================
+    // MAP CORE — LEAFLET
+    // ====================================================
+    let map;
+    let allStations = [];
+    let lineLayers = {};
+    let lineCoordinates = {};
+    let stationMarkersLayer;
+    const STATION_MIN_ZOOM = 15;
+    const TRAM_MIN_ZOOM = 13;
+    let isMapInitialized = false;
+    let allBounds;
+    let tramMarkers = {};
+    let animationFrames = {};
+
+    function initMap() {
+        stationMarkersLayer = L.layerGroup();
+        allBounds = L.latLngBounds();
+
+        map = L.map('leafletMap', {
+            zoomControl: false,
+            preferCanvas: true,
+        }).setView([33.5731, -7.5898], 13);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap, &copy; CartoDB',
+            maxZoom: 19, minZoom: 10
+        }).addTo(map);
+
+        map.on('zoomend', () => {
+            if (map.getZoom() >= STATION_MIN_ZOOM) {
+                if (!map.hasLayer(stationMarkersLayer)) map.addLayer(stationMarkersLayer);
+            } else {
+                if (map.hasLayer(stationMarkersLayer)) map.removeLayer(stationMarkersLayer);
+            }
+            updateTramSizes();
+        });
+
+        loadTramwayData();
+    }
+
+    // ====================================================
+    // TRAM MARKERS
+    // ====================================================
+    function createTramMarker(lineId, color, zoom) {
+        // Taille fixe en pixels pour que le tram ait la même taille
+        // quelle que soit l'échelle de la carte (2D) ou du zoom
+        const width = 35;
+        const height = 70;
+        const numWindows = Math.max(8, Math.floor(height / 9));
+        const windowsHtml = Array(numWindows).fill(0).map(() => '<div class="window"></div>').join('');
+
+        const tram = fleetData[lineId];
+        const healthClass = tram ? `health-${tram.status}` : 'health-ok';
+        const dotColor = tram ? statusColor[tram.status] : '#22c55e';
+
+        const html = `
+            <div class="tram-marker" style="width:${width}px;height:${height}px;">
+                <div class="tram-body ${healthClass}" style="width:100%;height:100%;background:linear-gradient(180deg,#e8e8e8 0%,#fff 20%,#fff 80%,#d4d4d4 100%);">
+                    <div class="tram-front"><div class="tram-lights"><div class="light"></div><div class="light"></div></div></div>
+                    <div class="tram-windows">${windowsHtml}</div>
+                    <div class="tram-articulation"></div>
+                    <div class="tram-section-line"></div>
+                    <div class="tram-section-line" style="left:66.66%"></div>
+                    <div class="tram-doors"><div class="door"></div><div class="door"></div><div class="door"></div></div>
+                    <div class="tram-wheels"><div class="wheel-set"><div class="wheel"></div><div class="wheel"></div></div><div class="wheel-set"><div class="wheel"></div><div class="wheel"></div></div></div>
+                    <div class="tram-line-badge" style="background:${color}">${lineId}</div>
+                    <div class="tram-health-dot" style="background:${dotColor}"></div>
+                    <div class="person-entering"><div class="person-head"></div><div class="person-body"><div class="person-backpack"></div></div><div class="person-legs"><div class="person-leg"></div><div class="person-leg"></div></div></div>
+                </div>
+            </div>`;
+
+        return L.divIcon({ className: 'custom-tram-icon', html, iconSize: [width, height], iconAnchor: [width/2, height/2] });
+    }
+
+    function smoothInterpolate(start, end, t) {
+        const eased = t < 0.5 ? 2*t*t : -1 + (4 - 2*t)*t;
+        return start + (end - start) * eased;
+    }
+
+    function animateTram(lineId, coordinates, color) {
+        if (!coordinates || coordinates.length < 2) return;
+        if (tramMarkers[lineId]) {
+            map.removeLayer(tramMarkers[lineId].marker);
+            if (animationFrames[lineId]) cancelAnimationFrame(animationFrames[lineId]);
+        }
+
+        let currentSeg = 0, progress = 0;
+        const speed = 0.002;
+        const tram = fleetData[lineId];
+        const currentZoom = map.getZoom();
+        const icon = createTramMarker(lineId, color, currentZoom);
+        const marker = L.marker(coordinates[0], { icon, zIndexOffset: 1000 }).addTo(map);
+
+        if (currentZoom < TRAM_MIN_ZOOM) { const el = marker.getElement(); if (el) el.style.display = 'none'; }
+
+        const popupHtml = tram ? `
+            <div class="station-popup">
+                <div class="station-name" style="font-size:0.85rem">🚊 Rame ${lineId}</div>
+                <div class="station-info">État : <strong style="color:${statusColor[tram.status]}">${tram.status === 'ok' ? 'Nominal' : tram.status === 'warn' ? 'Dégradé' : 'Critique'}</strong></div>
+                <div class="station-info">Santé : <strong>${tram.healthScore}%</strong></div>
+                <div class="station-info">Kilométrage : <strong>${tram.km.toLocaleString()} km</strong></div>
+                <div class="station-info">${tram.alerts.length > 0 ? `⚠ ${tram.alerts.length} alerte(s) prédictive(s)` : '✓ Aucune alerte'}</div>
+            </div>` : `<div class="station-popup"><div class="station-name">🚊 Tram ${lineId}</div></div>`;
+
+        marker.bindPopup(popupHtml);
+        tramMarkers[lineId] = { marker, lineId };
+
+        function animate() {
+            if (!map.hasLayer(marker)) return;
+            progress += speed;
+            if (progress >= 1) { progress = 0; currentSeg = (currentSeg + 1) % (coordinates.length - 1); }
+            const start = coordinates[currentSeg], end = coordinates[currentSeg+1];
+            const lat = smoothInterpolate(start[0], end[0], progress);
+            const lng = smoothInterpolate(start[1], end[1], progress);
+            const angle = Math.atan2(end[1]-start[1], end[0]-start[0]) * 180 / Math.PI;
+            marker.setLatLng([lat, lng]);
+            const icon = marker.getElement();
+            if (icon) {
+                const tb = icon.querySelector('.tram-marker');
+                if (tb) { tb.style.transform = `rotate(${angle}deg)`; tb.style.transition = 'transform 0.1s linear'; }
+            }
+            animationFrames[lineId] = requestAnimationFrame(animate);
+        }
+        animate();
+    }
+
+    function updateTramSizes() {
+        const zoom = map.getZoom();
+        const show = zoom >= TRAM_MIN_ZOOM;
+        Object.keys(tramMarkers).forEach(lineId => {
+            const { marker } = tramMarkers[lineId];
+            const lineConfig = tramLines.find(l => l.id === lineId);
+            if (lineConfig && marker) {
+                marker.setIcon(createTramMarker(lineId, lineConfig.color, zoom));
+                const el = marker.getElement();
+                if (el) el.style.display = show ? 'block' : 'none';
+            }
+        });
+    }
+
+    function initializeTrams() {
+        Object.keys(tramMarkers).forEach(lineId => {
+            if (tramMarkers[lineId]?.marker) map.removeLayer(tramMarkers[lineId].marker);
+            if (animationFrames[lineId]) cancelAnimationFrame(animationFrames[lineId]);
+        });
+        tramMarkers = {}; animationFrames = {};
+        Object.keys(lineCoordinates).forEach(lineId => {
+            const coords = lineCoordinates[lineId];
+            const lineConfig = tramLines.find(l => l.id === lineId);
+            if (coords?.length > 1 && lineConfig) {
+                setTimeout(() => animateTram(lineId, coords, lineConfig.color), 500);
+            }
+        });
+    }
+
+    // ====================================================
+    // GeoJSON Loading
+    // ====================================================
+    function onGeoJSONLoaded(geoData) {
+        const overlay = document.getElementById('loadingOverlay');
+        if (geoData?.features) {
+            processGeoJSONData(geoData);
+            overlay.style.display = 'none';
+            isMapInitialized = true;
+            if (map.getZoom() >= STATION_MIN_ZOOM) map.addLayer(stationMarkersLayer);
+            if (allBounds.isValid()) map.fitBounds(allBounds, { padding: [50, 50] });
+            setTimeout(initializeTrams, 1000);
+        } else { throw new Error('Format GeoJSON invalide'); }
+    }
+
+    function onGeoJSONError(error) {
+        console.warn('GeoJSON not found, using demo data:', error.message);
+        setTimeout(() => { createDemoData(); document.getElementById('loadingOverlay').style.display = 'none'; }, 1200);
+    }
+
+    function loadTramwayData() {
+        const embeddedEl = document.getElementById('embedded-tram-geojson');
+        const embeddedJson = embeddedEl?.textContent?.trim();
+        if (embeddedJson) {
+            try { onGeoJSONLoaded(JSON.parse(embeddedJson)); return; } catch(e) {}
+        }
+        const url = new URL('tram_casablanca.geojson', window.location.href).href;
+        fetch(url)
+            .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+            .then(onGeoJSONLoaded)
+            .catch(onGeoJSONError);
+    }
+
+    function processGeoJSONData(geoData) {
+        const lines = [], stations = [];
+        geoData.features.forEach(f => {
+            if (!f.geometry) return;
+            const p = f.properties || {};
+            const gt = f.geometry.type;
+            if (gt === 'LineString' || gt === 'MultiLineString') {
+                const rawRef = String(p.ref||'').trim();
+                const refStr = rawRef.toUpperCase().replace(/\s/g,'');
+                const isTram = p.route === 'tram' || p.railway === 'tram';
+                const isBusway = (p.route === 'bus' || p.network === 'CasaBusway') && /^BW[12]$/.test(refStr);
+                if (isBusway || (isTram && rawRef) || (rawRef && (refStr.includes('T') || refStr.includes('BW') || /^[1-4]$/.test(refStr)))) lines.push(f);
+            }
+            if (gt === 'Point' && (p.railway === 'tram_stop' || p.public_transport === 'stop_position' || p.public_transport === 'platform')) stations.push(f);
+        });
+        if (lines.length) processLines(lines);
+        else { console.warn('No lines from GeoJSON'); createDemoData(); return; }
+        if (stations.length) processStations(stations);
+    }
+
+    function processLines(features) {
+        const byRef = {};
+        features.forEach(f => {
+            const p = f.properties || {};
+            const rawRef = String(p.ref||'').trim();
+            let lineId = '';
+            if (rawRef) {
+                const r = rawRef.toUpperCase().replace(/\s/g,'');
+                if (/^[1-4]$/.test(r)) lineId = 'T'+r;
+                else if (/^BW[12]$/.test(r)) lineId = r;
+                else {
+                    lineId = r;
+                    lineId = lineId.replace('TI','T1').replace('TII','T2').replace('TIII','T3').replace('TIV','T4').replace('BUSWAY1','BW1').replace('BUSWAY2','BW2');
+                    if (!lineId.match(/^T[1-4]$|^BW[12]$/)) return;
+                }
+            }
+            if (!lineId && p.name) { const m = p.name.toUpperCase().match(/T[1-4]|BW[1-2]/); if (m) lineId = m[0]; }
+            if (!lineId) return;
+            const lc = tramLines.find(l => l.id === lineId);
+            if (!lc) return;
+            f.properties.color = lc.color; f.properties.lineId = lineId;
+            if (!byRef[lineId]) byRef[lineId] = { id: lineId, features: [] };
+            byRef[lineId].features.push(f);
+        });
+        Object.values(byRef).forEach(addLineToMap);
+    }
+
+    function addLineToMap(lineData) {
+        const lc = tramLines.find(l => l.id === lineData.id) || tramLines[0];
+        const lg = L.layerGroup();
+        const segs = [];
+        const toLL = c => c.map(p => [p[1], p[0]]);
+        const dist = (a,b) => Math.sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2);
+
+        lineData.features.forEach(f => {
+            if (!f.geometry?.coordinates) return;
+            if (f.geometry.type === 'LineString') segs.push(toLL(f.geometry.coordinates));
+            if (f.geometry.type === 'MultiLineString') f.geometry.coordinates.forEach(s => s.length && segs.push(toLL(s)));
+        });
+        if (!segs.length) return;
+
+        const ordered = [segs.shift()];
+        while (segs.length) {
+            const last = ordered[ordered.length-1];
+            let bi = 0, bd = Infinity, rev = false;
+            segs.forEach((s,i) => {
+                const ds = dist(last[last.length-1], s[0]);
+                const de = dist(last[last.length-1], s[s.length-1]);
+                if (ds < bd) { bd = ds; bi = i; rev = false; }
+                if (de < bd) { bd = de; bi = i; rev = true; }
+            });
+            let n = segs.splice(bi, 1)[0];
+            if (rev) n.reverse();
+            ordered.push(n);
+        }
+
+        const final = []; const seen = new Set();
+        ordered.flat().forEach(c => {
+            const k = `${c[0].toFixed(6)},${c[1].toFixed(6)}`;
+            if (!seen.has(k)) { seen.add(k); final.push(c); allBounds.extend(c); }
+        });
+
+        L.polyline(final, { color: lc.color, weight: 5, opacity: 0.85, lineCap: 'round', lineJoin: 'round' })
+            .on('mouseover', function() { this.setStyle({ weight: 8 }); })
+            .on('mouseout', function() { this.setStyle({ weight: 5 }); })
+            .addTo(lg);
+        lg.addTo(map);
+        lineLayers[lineData.id] = lg;
+        lineCoordinates[lineData.id] = final;
+    }
+
+    function processStations(features) {
+        features.forEach(f => {
+            const p = f.properties || {};
+            const coords = f.geometry.coordinates;
+            const pos = [coords[1], coords[0]];
+            const name = cleanStationName(p.name || p.ref || 'Station');
+            const lines = guessLineFromStationName(name);
+            allBounds.extend(pos);
+            const st = { id: name.toLowerCase().replace(/\s+/g,'_'), name, position: pos, lines, properties: p };
+            allStations.push(st);
+            addStationMarker(st);
+        });
+        if (map.getZoom() >= STATION_MIN_ZOOM) map.addLayer(stationMarkersLayer);
+    }
+
+    function addStationMarker(station) {
+        const marker = L.circleMarker(station.position, {
+            radius: 5, fillColor: '#4a5568', color: '#fff', weight: 1.5, fillOpacity: 0.9
+        }).bindPopup(`<div class="station-popup"><div class="station-name">${station.name}</div><div class="station-info">Lignes: ${station.lines.join(', ')}</div></div>`);
+        stationMarkersLayer.addLayer(marker);
+    }
+
+    function cleanStationName(name) {
+        return String(name).replace(/^tram_/i,'').replace(/^station_/i,'').replace(/_/g,' ').replace(/\b(stop|halt|station|gare|arrêt)\b/gi,'').replace(/\s+/g,' ').trim().replace(/\b(\w)/g,s=>s.toUpperCase());
+    }
+
+    function guessLineFromStationName(name) {
+        const n = name.toLowerCase();
+        const kw = {
+            'T1': ['gare','voyageurs','mers sultan','bourgogne','maarif','lissasfa','abdelmoumen','nations unies'],
+            'T2': ['ain diab','sidi maarouf','faculté','médecine','oasis','racine','anfa','corniche','bernoussi'],
+            'T3': ['hay el fida','derb sultan','zerkatouni','mohammed v'],
+            'T4': ['parc','ligue arabe','mohammed erradi','al qods','moulay youssef'],
+            'BW1': ['busway 1','bw1'], 'BW2': ['busway 2','bw2']
+        };
+        const lines = [];
+        for (const [line, keywords] of Object.entries(kw)) {
+            for (const k of keywords) { if (n.includes(k) && !lines.includes(line)) { lines.push(line); break; } }
+        }
+        return lines.length ? lines : ['T1'];
+    }
+
+    function createDemoData() {
+        const stations = [
+            { name:"Gare Casa-Voyageurs", lat:33.589, lng:-7.588, lines:["T1"] },
+            { name:"Place des Nations Unies", lat:33.581, lng:-7.596, lines:["T1"] },
+            { name:"Mers Sultan", lat:33.577, lng:-7.601, lines:["T1"] },
+            { name:"Bourgogne", lat:33.570, lng:-7.610, lines:["T1"] },
+            { name:"Maarif", lat:33.564, lng:-7.620, lines:["T1"] },
+            { name:"Sidi Maarouf", lat:33.555, lng:-7.635, lines:["T1","T2"] },
+            { name:"Faculté de Médecine", lat:33.552, lng:-7.640, lines:["T2"] },
+            { name:"Ain Diab", lat:33.534, lng:-7.670, lines:["T2"] },
+            { name:"Lissasfa", lat:33.549, lng:-7.645, lines:["T1"] },
+            { name:"Parc de la Ligue Arabe", lat:33.560, lng:-7.625, lines:["T4"] },
+            { name:"Mohammed Erradi", lat:33.565, lng:-7.630, lines:["T4"] },
+            { name:"Hay el Farah", lat:33.571, lng:-7.586, lines:["T2"] },
+            { name:"Sidi Bernoussi", lat:33.580, lng:-7.520, lines:["T2"] },
+            { name:"Derb Sultan", lat:33.575, lng:-7.590, lines:["T3"] },
+            { name:"Hay el Fida", lat:33.570, lng:-7.585, lines:["T3"] }
+        ];
+        stations.forEach(s => {
+            const pos = [s.lat, s.lng]; allBounds.extend(pos);
+            const st = { id:s.name.toLowerCase().replace(/\s+/g,'_'), name:s.name, position:pos, lines:s.lines, properties:{} };
+            allStations.push(st); addStationMarker(st);
+        });
+        tramLines.forEach(line => {
+            const lg = L.layerGroup();
+            const ls = allStations.filter(s => s.lines.includes(line.id));
+            if (ls.length > 1) {
+                const coords = ls.map(s => s.position);
+                lineCoordinates[line.id] = coords;
+                L.polyline(coords, { color: line.color, weight: 5, opacity: 0.85, lineCap: 'round', lineJoin: 'round' }).addTo(lg);
+                allBounds.extend(coords);
+            }
+            lg.addTo(map); lineLayers[line.id] = lg;
+        });
+        isMapInitialized = true;
+        if (allBounds.isValid()) map.fitBounds(allBounds, { padding:[50,50] });
+        setTimeout(initializeTrams, 500);
+    }
+
+    // ====================================================
+    // 3D MAP — MapLibre GL
+    // ====================================================
+    let maplibreMap = null;
+    let is3DMode = false;
+    let tram3DMarkers = {};
+    let animIntervals3D = {};
+    let station3DMarkers = [];
+    const TRAM_3D_MIN_ZOOM = 10;
+
+    function init3DMap() {
+        const center = allBounds.isValid() ? allBounds.getCenter() : { lat: 33.5731, lng: -7.5898 };
+        maplibreMap = new maplibregl.Map({
+            container: 'maplibre3D',
+            style: {
+                version: 8,
+                sources: { osm: { type: 'raster', tiles: ['https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png'.replace('{s}','a')], tileSize: 256 }},
+                layers: [{ id: 'osm', type: 'raster', source: 'osm', minzoom: 0, maxzoom: 19 }]
+            },
+            center: [center.lng, center.lat],
+            zoom: 13, pitch: 45, bearing: 0, antialias: true
+        });
+        maplibreMap.addControl(new maplibregl.NavigationControl());
+        maplibreMap.on('load', () => { add3DLines(); add3DStations(); setTimeout(initialize3DTrams, 500); });
+        maplibreMap.on('zoom', () => { update3DStationVis(); update3DTramVis(); });
+    }
+
+    function add3DLines() {
+        Object.keys(lineCoordinates).forEach(lineId => {
+            const coords = lineCoordinates[lineId];
+            const lc = tramLines.find(l => l.id === lineId);
+            if (!coords?.length || !lc) return;
+            const coordinates = coords.map(c => [c[1], c[0]]);
+            maplibreMap.addSource(`line-${lineId}`, { type:'geojson', data:{ type:'Feature', properties:{}, geometry:{ type:'LineString', coordinates }}});
+            maplibreMap.addLayer({ id:`line-${lineId}`, type:'line', source:`line-${lineId}`, layout:{ 'line-join':'round', 'line-cap':'round' }, paint:{ 'line-color':lc.color, 'line-width':6, 'line-opacity':0.85 }});
+        });
+    }
+
+    function create3DTramElement(lineId, color) {
+        const el = document.createElement('div');
+        el.className = 'tram-3d-marker';
+        el.style.width = '35px'; el.style.height = '70px';
+        const tram = fleetData[lineId];
+        const dotColor = tram ? statusColor[tram.status] : '#22c55e';
+        const hClass = tram ? `health-${tram.status}` : 'health-ok';
+        el.innerHTML = `
+            <div class="tram-marker" style="width:100%;height:100%;transform-origin:center center;">
+                <div class="tram-body ${hClass}" style="width:100%;height:100%;background:linear-gradient(180deg,#e8e8e8 0%,#fff 20%,#fff 80%,#d4d4d4 100%);">
+                    <div class="tram-front"><div class="tram-lights"><div class="light"></div><div class="light"></div></div></div>
+                    <div class="tram-windows">${Array(8).fill('<div class="window"></div>').join('')}</div>
+                    <div class="tram-articulation"></div>
+                    <div class="tram-section-line"></div>
+                    <div class="tram-section-line" style="left:66.66%"></div>
+                    <div class="tram-doors"><div class="door"></div><div class="door"></div><div class="door"></div></div>
+                    <div class="tram-wheels"><div class="wheel-set"><div class="wheel"></div><div class="wheel"></div></div><div class="wheel-set"><div class="wheel"></div><div class="wheel"></div></div></div>
+                    <div class="tram-line-badge" style="background:${color}">${lineId}</div>
+                    <div class="tram-health-dot" style="background:${dotColor}"></div>
+                    <div class="person-entering"><div class="person-head"></div><div class="person-body"><div class="person-backpack"></div></div><div class="person-legs"><div class="person-leg"></div><div class="person-leg"></div></div></div>
+                </div>
+            </div>`;
+        return el;
+    }
+
+    function add3DStations() {
+        station3DMarkers.forEach(m => m.remove()); station3DMarkers = [];
+        allStations.forEach(st => {
+            const el = document.createElement('div');
+            el.className = 'tram-3d-station-marker';
+            el.innerHTML = `<div class="station-pin"></div><div class="station-person"><div class="person-head"></div><div class="person-body"></div><div class="person-legs"><div class="person-leg"></div><div class="person-leg"></div></div></div>`;
+            const popup = new maplibregl.Popup({ offset:30, closeButton:false })
+                .setHTML(`<div style="font-size:0.75rem;font-family:'Sora',sans-serif"><strong>${st.name}</strong><br><span style="color:#64748b">${st.lines.join(', ')}</span></div>`);
+            const m = new maplibregl.Marker({ element:el, anchor:'bottom', offset:[0,8] })
+                .setLngLat([st.position[1], st.position[0]]).setPopup(popup).addTo(maplibreMap);
+            el.addEventListener('mouseenter', () => m.togglePopup());
+            el.addEventListener('mouseleave', () => m.togglePopup());
+            station3DMarkers.push(m);
+            el.style.display = maplibreMap.getZoom() >= STATION_MIN_ZOOM ? 'block' : 'none';
+        });
+    }
+
+    function initialize3DTrams() {
+        Object.keys(tram3DMarkers).forEach(lineId => { if (tram3DMarkers[lineId]) tram3DMarkers[lineId].remove(); if (animIntervals3D[lineId]) cancelAnimationFrame(animIntervals3D[lineId]); });
+        tram3DMarkers = {}; animIntervals3D = {};
+        Object.keys(lineCoordinates).forEach(lineId => {
+            const coords = lineCoordinates[lineId];
+            const lc = tramLines.find(l => l.id === lineId);
+            if (!coords?.length || !lc) return;
+            const el = create3DTramElement(lineId, lc.color);
+            const tram = fleetData[lineId];
+            const popupHtml = tram ? `<div style="font-size:0.75rem;font-family:'Sora',sans-serif"><strong>🚊 Rame ${lineId}</strong><br>État : <span style="color:${statusColor[tram.status]}">${tram.status === 'ok' ? 'Nominal' : tram.status === 'warn' ? 'Dégradé' : 'Critique'}</span><br>Santé : ${tram.healthScore}%</div>` : '';
+            const marker = new maplibregl.Marker({ element:el, anchor:'center', rotationAlignment:'map', pitchAlignment:'map' })
+                .setLngLat([coords[0][1], coords[0][0]])
+                .setPopup(new maplibregl.Popup({ offset:25 }).setHTML(popupHtml))
+                .addTo(maplibreMap);
+            tram3DMarkers[lineId] = marker;
+            if (maplibreMap.getZoom() < TRAM_3D_MIN_ZOOM) el.style.display = 'none';
+            let seg = 0, prog = 0;
+            function animate() {
+                if (!maplibreMap || !is3DMode) return;
+                prog += 0.002;
+                if (prog >= 1) { prog = 0; seg = (seg+1) % (coords.length-1); }
+                const s = coords[seg], e = coords[seg+1];
+                const t = prog < 0.5 ? 2*prog*prog : -1+(4-2*prog)*prog;
+                marker.setLngLat([s[1]+(e[1]-s[1])*t, s[0]+(e[0]-s[0])*t]);
+                const angle = Math.atan2(e[1]-s[1], e[0]-s[0]) * 180/Math.PI;
+                const tm = el.querySelector('.tram-marker');
+                if (tm) { tm.style.transform = `rotate(${angle}deg)`; tm.style.transition = 'transform 0.1s linear'; }
+                animIntervals3D[lineId] = requestAnimationFrame(animate);
+            }
+            animate();
+        });
+    }
+
+    function update3DStationVis() {
+        if (!maplibreMap) return;
+        const show = maplibreMap.getZoom() >= STATION_MIN_ZOOM;
+        station3DMarkers.forEach(m => { const el = m.getElement(); if (el) el.style.display = show ? 'block' : 'none'; });
+    }
+    function update3DTramVis() {
+        const show = maplibreMap?.getZoom() >= TRAM_3D_MIN_ZOOM;
+        Object.keys(tram3DMarkers).forEach(lineId => { const el = tram3DMarkers[lineId]?.getElement(); if (el) el.style.display = show ? 'block' : 'none'; });
+    }
+
+    function toggle3DView() {
+        is3DMode = !is3DMode;
+        const leafletDiv = document.getElementById('leafletMap');
+        const maplibreDiv = document.getElementById('maplibre3D');
+        const btn = document.getElementById('toggle-3d');
+        if (is3DMode) {
+            leafletDiv.style.display = 'none'; maplibreDiv.style.display = 'block'; btn.classList.add('active');
+            if (!maplibreMap) init3DMap();
+            else { maplibreMap.resize(); setTimeout(initialize3DTrams, 300); }
+            showNotification('Mode 3D activé');
+        } else {
+            Object.keys(animIntervals3D).forEach(id => { if (animIntervals3D[id]) cancelAnimationFrame(animIntervals3D[id]); });
+            leafletDiv.style.display = 'block'; maplibreDiv.style.display = 'none'; btn.classList.remove('active');
+            showNotification('Mode 2D activé');
+        }
+    }
+
+    // ====================================================
+    // ALERT OVERLAY ON MAP
+    // ====================================================
+    let alertMarkers = [];
+    let showAlertsOnMap = false;
+
+    function toggleAlertsOnMap() {
+        showAlertsOnMap = !showAlertsOnMap;
+        document.getElementById('toggle-alerts-map').classList.toggle('active', showAlertsOnMap);
+        clearAlertMarkers();
+        if (showAlertsOnMap) renderAlertsOnMap();
+        showNotification(showAlertsOnMap ? '🔔 Alertes affichées sur carte' : '🔕 Alertes masquées');
+    }
+
+    function renderAlertsOnMap() {
+        Object.values(fleetData).forEach(tram => {
+            if (tram.status !== 'ok' && tramMarkers[tram.lineId]) {
+                const pos = tramMarkers[tram.lineId].marker.getLatLng();
+                const icon = L.divIcon({
+                    className: '', iconSize: [40, 40], iconAnchor: [20, 20],
+                    html: `<div style="width:40px;height:40px;border-radius:50%;border:2px solid ${statusColor[tram.status]};animation:radarPing 1.5s ease-out infinite;pointer-events:none"></div>`
+                });
+                const m = L.marker(pos, { icon, zIndexOffset: 2000, interactive: false }).addTo(map);
+                alertMarkers.push(m);
+            }
+        });
+    }
+
+    function clearAlertMarkers() {
+        alertMarkers.forEach(m => map.removeLayer(m));
+        alertMarkers = [];
+    }
+
+    // ====================================================
+    // REFRESH MAINTENANCE DATA
+    // ====================================================
+    async function refreshMaintenanceData() {
+        const btn = document.getElementById('refresh-maintenance');
+        btn.style.animation = 'spin 0.5s linear infinite';
+        btn.style.animationIterationCount = '2';
+        try {
+            await loadPredictiveData();
+        } catch (e) {
+            console.warn('Erreur backend prédictif, utilisation du simulateur frontal :', e);
+            generateFleetData();
+        }
+        renderFleetList();
+        renderAlertQueue();
+        renderMaintenanceTimeline();
+        if (isMapInitialized) {
+            updateTramSizes();
+            if (showAlertsOnMap) { clearAlertMarkers(); renderAlertsOnMap(); }
+        }
+        setTimeout(() => {
+            btn.style.animation = '';
+            showNotification('✓ Données maintenance actualisées');
+        }, 1000);
+    }
+
+    // ====================================================
+    // BUTTON HANDLERS
+    // ====================================================
+    document.getElementById('zoom-in').addEventListener('click', () => { if (isMapInitialized) map.zoomIn(); });
+    document.getElementById('zoom-out').addEventListener('click', () => { if (isMapInitialized) map.zoomOut(); });
+    document.getElementById('reset-map').addEventListener('click', () => {
+        if (isMapInitialized) {
+            selectedTramId = null;
+            renderFleetList();
+            renderAlertQueue();
+            if (allBounds.isValid()) map.fitBounds(allBounds, { padding:[50,50] });
+            else map.setView([33.5731, -7.5898], 13);
+        }
+    });
+    document.getElementById('toggle-3d').addEventListener('click', toggle3DView);
+    document.getElementById('toggle-alerts-map').addEventListener('click', toggleAlertsOnMap);
+    document.getElementById('refresh-maintenance').addEventListener('click', refreshMaintenanceData);
+
+    // ====== Frontend ↔ Predictive Backend Integration (Debug panel) ======
+    function showData(data) {
+        const el = document.getElementById('output');
+        if (!el) return;
+        el.textContent = JSON.stringify(data, null, 2);
+    }
+
+    function loadFleet() {
+        fetch(`${PRED_API_BASE}/api/fleet/summary`)
+            .then(res => res.json())
+            .then(showData)
+            .catch(err => showData({ error: 'Erreur Fleet', detail: String(err) }));
+    }
+
+    function loadSensors() {
+        fetch(`${PRED_API_BASE}/api/vehicle/T1-001/sensors`)
+            .then(res => res.json())
+            .then(showData)
+            .catch(err => showData({ error: 'Erreur Sensors', detail: String(err) }));
+    }
+
+    function loadAlerts() {
+        fetch(`${PRED_API_BASE}/api/alerts`)
+            .then(res => res.json())
+            .then(showData)
+            .catch(err => showData({ error: 'Erreur Alerts', detail: String(err) }));
+    }
+
+    // Attach debug buttons
+    document.getElementById('btnFleet').addEventListener('click', loadFleet);
+    document.getElementById('btnSensors').addEventListener('click', loadSensors);
+    document.getElementById('btnAlerts').addEventListener('click', loadAlerts);
+
+    // Collapsible debug panel
+    document.getElementById('debug-toggle').addEventListener('click', () => {
+        const panel = document.getElementById('debug-panel');
+        const btnRow = document.getElementById('debug-buttons');
+        const out = document.getElementById('output');
+        const toggle = document.getElementById('debug-toggle');
+        const isCollapsed = btnRow.style.display === 'none';
+        if (isCollapsed) {
+            btnRow.style.display = 'flex';
+            out.style.display = 'block';
+            toggle.textContent = '[−]';
+        } else {
+            btnRow.style.display = 'none';
+            out.style.display = 'none';
+            toggle.textContent = '[+]';
+        }
+    });
+
+    // Spin keyframe for refresh btn
+    const styleEl = document.createElement('style');
+    styleEl.textContent = '@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }';
+    document.head.appendChild(styleEl);
+
+    // ====================================================
+    // INIT SEQUENCE
+    // ====================================================
+    document.addEventListener('DOMContentLoaded', () => {
+        initMap();
+        // Chargement initial des données de maintenance (backend prédictif puis fallback si besoin)
+        refreshMaintenanceData();
+
+        // Auto-refresh maintenance data every 30s
+        setInterval(() => {
+            refreshMaintenanceData();
+        }, 30000);
+    });
+    
+    
+
+    </script>
+    <script>
+        const tramData = {{ geojson | tojson }};
+        L.geoJSON(tramData).addTo(map);
     </script>
 </body>
 </html>

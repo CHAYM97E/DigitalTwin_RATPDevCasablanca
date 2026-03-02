@@ -1,623 +1,350 @@
 """
-API Backend REST complète pour le Digital Twin
-Endpoints pour ML, analytics, et données temps réel
+Flask REST API for Predictive Maintenance Integration
+Connects ML engine with Digital Twin frontend
 """
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
-import mysql.connector
-from datetime import datetime, timedelta
-import pandas as pd
-import numpy as np
-from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
-from sklearn.model_selection import train_test_split
-import pickle
+from datetime import datetime
+import sys
 import os
+import numpy as np
 
-app = Flask(__name__)
-CORS(app)
 
-# ============================================================================
-# CONFIGURATION
-# ============================================================================
 
-DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': '3Mama1baba@',
-    'database': 'tram_rATP'
-}
 
-MODELS_DIR = "../data/processed"
-os.makedirs(MODELS_DIR, exist_ok=True)
+# Add backend directory to path
+sys.path.append(os.path.dirname(__file__))
 
-# ============================================================================
-# CLASSE DE GESTION DES MODÈLES ML
-# ============================================================================
+app = Flask(__name__, template_folder="templates", static_folder="static")
+CORS(app)  # Enable CORS for frontend integration
 
-class MLModels:
-    """Gestionnaire centralisé des modèles ML"""
-    
-    def __init__(self):
-        self.delay_model = None
-        self.maintenance_model = None
-        self.delay_metrics = {}
-        self.maintenance_metrics = {}
-        
-    def load_models(self):
-        """Charge les modèles depuis le disque"""
-        try:
-            delay_path = f"{MODELS_DIR}/delay_model.pkl"
-            maint_path = f"{MODELS_DIR}/maintenance_model.pkl"
-            
-            if os.path.exists(delay_path):
-                with open(delay_path, 'rb') as f:
-                    self.delay_model = pickle.load(f)
-                print("✅ Modèle de retard chargé")
-            
-            if os.path.exists(maint_path):
-                with open(maint_path, 'rb') as f:
-                    self.maintenance_model = pickle.load(f)
-                print("✅ Modèle de maintenance chargé")
-                
-        except Exception as e:
-            print(f"⚠️  Erreur chargement modèles: {e}")
-    
-    def train_delay_model(self):
-        """Entraîne le modèle de prédiction des retards"""
-        conn = mysql.connector.connect(**DB_CONFIG)
-        
-        query = """
-        SELECT passenger_load, weather, incident_flag, delay_minutes
-        FROM tram_operations
-        WHERE delay_minutes IS NOT NULL
-        """
-        df = pd.read_sql(query, conn)
-        conn.close()
-        
-        # Encoder
-        df['weather'] = df['weather'].map({'clear': 0, 'rain': 1, 'wind': 2})
-        df = df.fillna(0)
-        
-        X = df[['passenger_load', 'weather', 'incident_flag']]
-        y = df['delay_minutes']
-        
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42
-        )
-        
-        self.delay_model = RandomForestRegressor(
-            n_estimators=100, 
-            max_depth=10,
-            random_state=42
-        )
-        self.delay_model.fit(X_train, y_train)
-        
-        # Métriques
-        from sklearn.metrics import mean_absolute_error, r2_score
-        y_pred = self.delay_model.predict(X_test)
-        
-        self.delay_metrics = {
-            'mae': float(mean_absolute_error(y_test, y_pred)),
-            'r2': float(r2_score(y_test, y_pred)),
-            'rmse': float(np.sqrt(np.mean((y_test - y_pred) ** 2)))
-        }
-        
-        # Sauvegarder
-        with open(f"{MODELS_DIR}/delay_model.pkl", 'wb') as f:
-            pickle.dump(self.delay_model, f)
-        
-        return self.delay_metrics
-    
-    def train_maintenance_model(self):
-        """Entraîne le modèle de maintenance prédictive"""
-        conn = mysql.connector.connect(**DB_CONFIG)
-        
-        query = """
-        SELECT temperature, vibration, days_since_last_maintenance, failure
-        FROM maintenance
-        WHERE failure IS NOT NULL
-        """
-        df = pd.read_sql(query, conn)
-        conn.close()
-        
-        X = df[['temperature', 'vibration', 'days_since_last_maintenance']]
-        y = df['failure']
-        
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42
-        )
-        
-        self.maintenance_model = RandomForestClassifier(
-            n_estimators=100,
-            max_depth=8,
-            random_state=42
-        )
-        self.maintenance_model.fit(X_train, y_train)
-        
-        # Métriques
-        from sklearn.metrics import accuracy_score, precision_score, recall_score
-        y_pred = self.maintenance_model.predict(X_test)
-        
-        self.maintenance_metrics = {
-            'accuracy': float(accuracy_score(y_test, y_pred)),
-            'precision': float(precision_score(y_test, y_pred, zero_division=0)),
-            'recall': float(recall_score(y_test, y_pred, zero_division=0))
-        }
-        
-        # Sauvegarder
-        with open(f"{MODELS_DIR}/maintenance_model.pkl", 'wb') as f:
-            pickle.dump(self.maintenance_model, f)
-        
-        return self.maintenance_metrics
-    
-    def predict_delay(self, passenger_load, weather, incident_flag):
-        """Prédit le retard"""
-        if self.delay_model is None:
-            return None
-        
-        weather_map = {'clear': 0, 'rain': 1, 'wind': 2}
-        weather_encoded = weather_map.get(weather, 0)
-        
-        X = np.array([[passenger_load, weather_encoded, incident_flag]])
-        prediction = self.delay_model.predict(X)[0]
-        
-        return max(0, float(prediction))
-    
-    def predict_maintenance(self, temperature, vibration, days_since):
-        """Prédit le risque de panne"""
-        if self.maintenance_model is None:
-            return None
-        
-        X = np.array([[temperature, vibration, days_since]])
-        prediction = self.maintenance_model.predict(X)[0]
-        proba = self.maintenance_model.predict_proba(X)[0]
-        
-        return {
-            'will_fail': bool(prediction),
-            'failure_probability': float(proba[1] * 100),
-            'risk_level': 'high' if proba[1] > 0.7 else 'medium' if proba[1] > 0.4 else 'low'
-        }
 
-# Instance globale
-ml_models = MLModels()
+@app.route("/", methods=["GET"])
+def frontend():
+    return render_template("index.html")
 
-# ============================================================================
-# ENDPOINTS API
-# ============================================================================
 
-@app.route('/api/status')
-def api_status():
-    """Statut du système"""
-    try:
-        conn = mysql.connector.connect(**DB_CONFIG)
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT COUNT(*) FROM tram_operations")
-        total_ops = cursor.fetchone()[0]
-        
-        cursor.execute("SELECT COUNT(DISTINCT tram_id) FROM tram_operations")
-        total_trams = cursor.fetchone()[0]
-        
-        cursor.close()
-        conn.close()
-        
-        return jsonify({
-            'status': 'online',
-            'database': 'connected',
-            'total_operations': total_ops,
-            'total_trams': total_trams,
-            'models': {
-                'delay': ml_models.delay_model is not None,
-                'maintenance': ml_models.maintenance_model is not None
-            },
-            'timestamp': datetime.now().isoformat()
-        })
-    except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        }), 500
+from Predictive_maintenance import (
+    CasablancaFleetMonitor,
+    PredictiveMaintenanceEngine,
+    ComponentType,
+    prediction_to_dict
+)
 
-@app.route('/api/trams')
-def get_all_trams():
-    """Liste tous les tramways avec leurs statistiques"""
-    conn = mysql.connector.connect(**DB_CONFIG)
-    cursor = conn.cursor(dictionary=True)
-    
-    cursor.execute("""
-    SELECT 
-        tram_id,
-        COUNT(*) as total_trips,
-        AVG(delay_minutes) as avg_delay,
-        MAX(delay_minutes) as max_delay,
-        AVG(passenger_load) as avg_passengers,
-        MAX(timestamp) as last_seen
-    FROM tram_operations
-    GROUP BY tram_id
-    ORDER BY tram_id
-    """)
-    
-    trams = cursor.fetchall()
-    
-    # Ajouter les données de maintenance
-    for tram in trams:
-        cursor.execute("""
-        SELECT component, temperature, vibration, failure
-        FROM maintenance
-        WHERE tram_id = %s
-        """, (tram['tram_id'],))
-        tram['maintenance'] = cursor.fetchall()
-    
-    cursor.close()
-    conn.close()
-    
+
+# Initialize monitoring system
+fleet_monitor = CasablancaFleetMonitor()
+engine = PredictiveMaintenanceEngine()
+
+
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """API health check"""
     return jsonify({
-        'count': len(trams),
-        'trams': trams
-    })
-
-@app.route('/api/operations')
-def get_operations():
-    """Récupère les opérations avec filtres"""
-    conn = mysql.connector.connect(**DB_CONFIG)
-    cursor = conn.cursor(dictionary=True)
-    
-    # Paramètres
-    tram_id = request.args.get('tram_id')
-    limit = int(request.args.get('limit', 100))
-    
-    query = "SELECT * FROM tram_operations"
-    params = []
-    
-    if tram_id:
-        query += " WHERE tram_id = %s"
-        params.append(tram_id)
-    
-    query += " ORDER BY timestamp DESC LIMIT %s"
-    params.append(limit)
-    
-    cursor.execute(query, params)
-    operations = cursor.fetchall()
-    
-    cursor.close()
-    conn.close()
-    
-    return jsonify({
-        'count': len(operations),
-        'operations': operations
-    })
-
-@app.route('/api/analytics')
-def get_analytics():
-    """Analytics complètes du réseau"""
-    conn = mysql.connector.connect(**DB_CONFIG)
-    cursor = conn.cursor(dictionary=True)
-    
-    # Stats globales
-    cursor.execute("""
-    SELECT 
-        COUNT(*) as total_operations,
-        COUNT(DISTINCT tram_id) as active_trams,
-        AVG(delay_minutes) as avg_delay,
-        SUM(passenger_load) as total_passengers,
-        SUM(incident_flag) as total_incidents
-    FROM tram_operations
-    """)
-    global_stats = cursor.fetchone()
-    
-    # Par ligne
-    cursor.execute("""
-    SELECT 
-        SUBSTRING(tram_id, 1, 2) as line,
-        COUNT(*) as operations,
-        AVG(delay_minutes) as avg_delay,
-        AVG(passenger_load) as avg_passengers
-    FROM tram_operations
-    GROUP BY line
-    """)
-    line_stats = cursor.fetchall()
-    
-    # Par heure
-    cursor.execute("""
-    SELECT 
-        HOUR(timestamp) as hour,
-        COUNT(*) as operations,
-        AVG(delay_minutes) as avg_delay,
-        AVG(passenger_load) as avg_passengers
-    FROM tram_operations
-    GROUP BY hour
-    ORDER BY hour
-    """)
-    hourly_stats = cursor.fetchall()
-    
-    cursor.close()
-    conn.close()
-    
-    return jsonify({
-        'global': global_stats,
-        'by_line': line_stats,
-        'by_hour': hourly_stats,
+        'status': 'healthy',
+        'service': 'RATP Dev Casablanca Predictive Maintenance API',
+        'version': '1.0.0',
         'timestamp': datetime.now().isoformat()
     })
 
-@app.route('/api/maintenance/alerts')
-def maintenance_alerts():
-    """Alertes de maintenance critiques"""
-    conn = mysql.connector.connect(**DB_CONFIG)
-    cursor = conn.cursor(dictionary=True)
-    
-    cursor.execute("""
-    SELECT *
-    FROM maintenance
-    WHERE temperature > 70 OR vibration > 5 OR failure = 1
-    ORDER BY failure DESC, temperature DESC
-    """)
-    
-    alerts = cursor.fetchall()
-    
-    cursor.close()
-    conn.close()
-    
-    return jsonify({
-        'alerts': alerts,
-        'count': len(alerts),
-        'critical': len([a for a in alerts if a['failure'] == 1])
-    })
 
-@app.route('/api/maintenance/predict', methods=['POST'])
-def predict_component_failure():
+@app.route('/api/fleet/summary', methods=['GET'])
+def get_fleet_summary():
     """
-    Prédit la panne d'un composant avec le système industriel
-    
-    Body JSON:
-    {
-        "tram_id": "T1-001",
-        "component": "motor",
-        "temperature": 75,
-        "vibration": 5.2,
-        "days_since_maintenance": 45
-    }
+    Get fleet-wide health summary
+    Returns aggregated metrics for all vehicles
     """
     try:
-        # Charger le système de maintenance prédictive
-        import sys
-        sys.path.append('../src')
-        from predictive_maintenance_industrial import IndustrialPredictiveMaintenanceSystem
+        summary = fleet_monitor.get_fleet_health_summary()
         
-        system = IndustrialPredictiveMaintenanceSystem()
+        # Convert predictions to serializable format
+        serialized_predictions = {
+            'critical': [prediction_to_dict(p) for p in summary['predictions']['critical']],
+            'warning': [prediction_to_dict(p) for p in summary['predictions']['warning']],
+            'normal': [prediction_to_dict(p) for p in summary['predictions']['normal'][:10]]  # Limit normal
+        }
         
-        # Charger les modèles
-        import pickle
-        component = request.json.get('component', 'motor')
-        model_path = f"{MODELS_DIR}/xgb_model_{component}.pkl"
+        return jsonify({
+            'success': True,
+            'data': {
+                'total_vehicles': summary['total_vehicles'],
+                'critical_count': summary['critical_count'],
+                'warning_count': summary['warning_count'],
+                'normal_count': summary['normal_count'],
+                'fleet_health_score': round(summary['fleet_health_score'], 1),
+                'predictions': serialized_predictions,
+                'timestamp': datetime.now().isoformat()
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/vehicle/<vehicle_id>/prediction', methods=['GET'])
+def get_vehicle_prediction(vehicle_id):
+    """
+    Get real-time prediction for specific vehicle
+    Example: /api/vehicle/T1-001/prediction
+    """
+    try:
+        # Extract line from vehicle_id
+        line = vehicle_id.split('-')[0]
         
-        if os.path.exists(model_path):
-            with open(model_path, 'rb') as f:
-                system.models[component] = pickle.load(f)
-            with open(f"{MODELS_DIR}/scaler_{component}.pkl", 'rb') as f:
-                system.scalers[component] = pickle.load(f)
-            with open(f"{MODELS_DIR}/anomaly_{component}.pkl", 'rb') as f:
-                system.anomaly_detectors[component] = pickle.load(f)
-        else:
-            return jsonify({'error': 'Model not trained. Train models first.'}), 400
-        
-        # Prédire
-        prediction = system.predict_failure_probability(
-            request.json.get('tram_id'),
-            component,
-            request.json
+        # Simulate sensor reading for this vehicle
+        reading = engine.simulate_sensor_data(
+            vehicle_id=vehicle_id,
+            line=line,
+            station_idx=0,
+            is_faulty=False  # Will be random in real system
         )
         
-        # Ajouter l'explainability
-        explanation = system.explain_prediction(component, request.json)
-        prediction['explanation'] = explanation
-        
-        return jsonify(prediction)
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/maintenance/rul/<tram_id>/<component>')
-def get_remaining_useful_life(tram_id, component):
-    """Calcule le RUL (Remaining Useful Life) pour un composant"""
-    try:
-        conn = mysql.connector.connect(**DB_CONFIG)
-        cursor = conn.cursor(dictionary=True)
-        
-        cursor.execute("""
-        SELECT *
-        FROM maintenance
-        WHERE tram_id = %s AND component = %s
-        LIMIT 1
-        """, (tram_id, component))
-        
-        data = cursor.fetchone()
-        cursor.close()
-        conn.close()
-        
-        if not data:
-            return jsonify({'error': 'Component not found'}), 404
-        
-        # Charger le système
-        import sys
-        sys.path.append('../src')
-        from predictive_maintenance_industrial import IndustrialPredictiveMaintenanceSystem
-        
-        system = IndustrialPredictiveMaintenanceSystem()
-        
-        # Calculer RUL
-        rul = system._calculate_rul(data, 0.5)  # Estimation moyenne
+        # Get prediction
+        prediction = engine.predict(reading, ComponentType.AIR_PRODUCTION_UNIT)
         
         return jsonify({
-            'tram_id': tram_id,
-            'component': component,
-            'remaining_useful_life_days': rul,
-            'recommended_maintenance_date': (datetime.now() + timedelta(days=rul)).isoformat()
+            'success': True,
+            'data': prediction_to_dict(prediction)
         })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/ml/train', methods=['POST'])
-def train_models():
-    """Entraîne ou réentraîne les modèles ML"""
-    try:
-        results = {}
-        
-        # Entraîner le modèle de retard
-        print("🧠 Entraînement du modèle de prédiction des retards...")
-        delay_metrics = ml_models.train_delay_model()
-        results['delay_model'] = {
-            'status': 'success',
-            'metrics': delay_metrics
-        }
-        
-        # Entraîner le modèle de maintenance
-        print("🔧 Entraînement du modèle de maintenance prédictive...")
-        maintenance_metrics = ml_models.train_maintenance_model()
-        results['maintenance_model'] = {
-            'status': 'success',
-            'metrics': maintenance_metrics
-        }
-        
-        return jsonify({
-            'status': 'success',
-            'results': results,
-            'timestamp': datetime.now().isoformat()
-        })
-        
     except Exception as e:
         return jsonify({
-            'status': 'error',
-            'message': str(e)
+            'success': False,
+            'error': str(e)
         }), 500
 
-@app.route('/api/ml/predict/delay', methods=['POST'])
-def predict_delay():
-    """Prédit le retard pour des conditions données"""
-    data = request.json
-    
-    if ml_models.delay_model is None:
-        return jsonify({
-            'error': 'Model not trained. Call /api/ml/train first'
-        }), 400
-    
-    prediction = ml_models.predict_delay(
-        data.get('passenger_load', 150),
-        data.get('weather', 'clear'),
-        data.get('incident_flag', 0)
-    )
-    
-    return jsonify({
-        'predicted_delay': prediction,
-        'metrics': ml_models.delay_metrics,
-        'input': data
-    })
 
-@app.route('/api/ml/predict/maintenance', methods=['POST'])
-def predict_maintenance():
-    """Prédit le risque de panne"""
-    data = request.json
-    
-    if ml_models.maintenance_model is None:
-        return jsonify({
-            'error': 'Model not trained. Call /api/ml/train first'
-        }), 400
-    
-    prediction = ml_models.predict_maintenance(
-        data.get('temperature', 65),
-        data.get('vibration', 4),
-        data.get('days_since_maintenance', 30)
-    )
-    
-    return jsonify({
-        'prediction': prediction,
-        'metrics': ml_models.maintenance_metrics,
-        'input': data
-    })
-
-@app.route('/api/stations')
-def get_stations():
-    """Liste des stations par ligne"""
-    stations = {
-        'T1': [
-            'Sidi Moumen', 'Nassim', 'Mohammed Zefzaf', 'Centre de maintenance',
-            'Hôpital Sidi Moumen', 'Attacharouk', 'Okba Ibnou Nafia', 'Forces Auxiliaires',
-            'Hay Raja', 'Ibn Tachfine', 'Hay Mohammadi', 'Achouhada', 'Ali Yata',
-            'Grande Ceinture', 'Anciens Abattoirs', 'Bahmad', 'Gare Casa-Voyageurs',
-            'Place Al Yassir', 'La Résistance', 'Mohammed Diouri', 'Marché Central',
-            'Place Nations-Unies', 'Place Mohammed V', 'Avenue Hassan II', 'Les Hôpitaux',
-            'Faculté de Médecine', 'Abdelmoumen', 'Bachkou', 'Mekka', 'Gare Oasis',
-            'Panoramique', 'Technopark', 'Zénith', 'Gare Casa-Sud', 'Facultés',
-            'Al Laymoun', 'Lissasfa'
-        ],
-        'T2': [
-            'Ain Diab Plage', 'Corniche', 'Boulevard Océan', 'Abdelmoumen',
-            'Nations-Unies', 'Mdakra', 'Ali Yata', 'Derb Sultan',
-            'Abdellah Ben Cherif', 'Moulay Rachid', 'Derb Mila',
-            'Hay Hassani', 'Sidi Bernoussi'
-        ],
-        'T3': [
-            'Gare Casa Port', 'Boulevard Mohammed VI', 'Place Victoire',
-            'Mohammed Smiha', 'Derb Sultan', 'Moulay Rachid',
-            'Driss El Harti', 'Hay El Wahda'
-        ],
-        'T4': [
-            'Parc Ligue Arabe', 'Place Mohammed V', 'Derb Mila',
-            'Moulay Rachid', 'Driss El Harti', 'Place Victoire',
-            'Mohammed Erradien'
-        ]
-    }
-    
-    return jsonify(stations)
-
-@app.route('/api/report/generate', methods=['POST'])
-def generate_report():
-    """Déclenche la génération d'un rapport PDF"""
+@app.route('/api/vehicle/<vehicle_id>/sensors', methods=['GET'])
+def get_vehicle_sensors(vehicle_id):
+    """
+    Get current sensor readings for a vehicle
+    """
     try:
-        import report_generator
+        line = vehicle_id.split('-')[0]
         
-        date_str = request.args.get('date')
-        date = datetime.strptime(date_str, '%Y-%m-%d') if date_str else None
-        
-        report_path = report_generator.generate_daily_report(date)
+        reading = engine.simulate_sensor_data(
+            vehicle_id=vehicle_id,
+            line=line,
+            station_idx=0
+        )
         
         return jsonify({
-            'status': 'success',
-            'report_path': report_path,
-            'timestamp': datetime.now().isoformat()
+            'success': True,
+            'data': {
+                'vehicle_id': reading.vehicle_id,
+                'timestamp': reading.timestamp.isoformat(),
+                'sensors': {
+                    'air_pressure_tp2': round(reading.tp2_pressure, 2),
+                    'air_pressure_tp3': round(reading.tp3_pressure, 2),
+                    'compressor_temperature': round(reading.h1_temperature, 1),
+                    'motor_current': round(reading.motor_current, 1),
+                    'oil_temperature': round(reading.oil_temperature, 1),
+                    'differential_pressure': round(reading.dv_pressure, 2),
+                    'reservoir_pressure': round(reading.reservoirs_pressure, 2),
+                    'speed': round(reading.speed, 1),
+                    'compressor_status': reading.comp_status,
+                    'dryer_status': reading.dryer_status,
+                    'governor_status': reading.mpg_status
+                },
+                'location': {
+                    'latitude': round(reading.latitude, 6),
+                    'longitude': round(reading.longitude, 6)
+                },
+                'environment': {
+                    'ambient_temperature': round(reading.ambient_temperature, 1),
+                    'humidity': round(reading.humidity, 1)
+                }
+            }
         })
     except Exception as e:
         return jsonify({
-            'status': 'error',
-            'message': str(e)
+            'success': False,
+            'error': str(e)
         }), 500
 
-# ============================================================================
-# LANCEMENT DU SERVEUR
-# ============================================================================
+
+@app.route('/api/alerts', methods=['GET'])
+def get_active_alerts():
+    """
+    Get all active maintenance alerts
+    """
+    try:
+        summary = fleet_monitor.get_fleet_health_summary()
+        
+        # Combine critical and warning
+        alerts = []
+        
+        for pred in summary['predictions']['critical']:
+            alerts.append({
+                **prediction_to_dict(pred),
+                'alert_level': 'CRITICAL',
+                'priority': 1
+            })
+        
+        for pred in summary['predictions']['warning']:
+            alerts.append({
+                **prediction_to_dict(pred),
+                'alert_level': 'WARNING',
+                'priority': 2
+            })
+        
+        # Sort by priority and failure probability
+        alerts.sort(key=lambda x: (x['priority'], -x['failure_probability']))
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'total_alerts': len(alerts),
+                'critical_alerts': len(summary['predictions']['critical']),
+                'warning_alerts': len(summary['predictions']['warning']),
+                'alerts': alerts,
+                'timestamp': datetime.now().isoformat()
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/line/<line_id>/health', methods=['GET'])
+def get_line_health(line_id):
+    """
+    Get health summary for specific line (T1, T2, T3, T4)
+    """
+    try:
+        summary = fleet_monitor.get_fleet_health_summary()
+        
+        # Filter predictions for this line
+        line_predictions = {
+            'critical': [p for p in summary['predictions']['critical'] if p.vehicle_id.startswith(line_id)],
+            'warning': [p for p in summary['predictions']['warning'] if p.vehicle_id.startswith(line_id)],
+            'normal': [p for p in summary['predictions']['normal'] if p.vehicle_id.startswith(line_id)]
+        }
+        
+        total = sum(len(v) for v in line_predictions.values())
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'line_id': line_id,
+                'total_vehicles': total,
+                'critical_count': len(line_predictions['critical']),
+                'warning_count': len(line_predictions['warning']),
+                'normal_count': len(line_predictions['normal']),
+                'line_health_score': (len(line_predictions['normal']) / total * 100) if total > 0 else 0,
+                'predictions': {
+                    'critical': [prediction_to_dict(p) for p in line_predictions['critical']],
+                    'warning': [prediction_to_dict(p) for p in line_predictions['warning']],
+                    'normal': [prediction_to_dict(p) for p in line_predictions['normal'][:5]]
+                }
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/maintenance/schedule', methods=['POST'])
+def schedule_maintenance():
+    """
+    Schedule maintenance based on predictions
+    Expects: {"vehicle_id": "T1-001", "maintenance_type": "PREVENTIVE", "scheduled_time": "2026-01-29T10:00:00"}
+    """
+    try:
+        data = request.json
+        
+        # In real system, this would update database and notify maintenance team
+        return jsonify({
+            'success': True,
+            'data': {
+                'vehicle_id': data.get('vehicle_id'),
+                'maintenance_type': data.get('maintenance_type'),
+                'scheduled_time': data.get('scheduled_time'),
+                'status': 'SCHEDULED',
+                'confirmation_id': f"MAINT-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/statistics/daily', methods=['GET'])
+def get_daily_statistics():
+    """
+    Get daily statistics for dashboard charts
+    """
+    # Generate historical data for charts
+    hours = list(range(24))
+    
+    # Simulate daily health trend
+    health_scores = [92 - (i * 0.5) + np.random.uniform(-2, 2) for i in range(24)]
+    
+    # Simulate failure predictions per hour
+    failure_predictions = [int(32 * (1 + 0.3 * np.sin(i/4)) + np.random.uniform(-3, 3)) for i in range(24)]
+    
+    # Simulate alerts per hour
+    alerts_per_hour = [int(5 * (1 + 0.5 * np.sin(i/3)) + np.random.uniform(-1, 1)) for i in range(24)]
+    
+    return jsonify({
+        'success': True,
+        'data': {
+            'hours': [f"{h:02d}:00" for h in hours],
+            'fleet_health_scores': [round(s, 1) for s in health_scores],
+            'failure_predictions': failure_predictions,
+            'alerts_generated': alerts_per_hour,
+            'maintenance_scheduled': [int(a * 0.3) for a in alerts_per_hour]
+        }
+    })
+
+
+@app.route('/api/components/health', methods=['GET'])
+def get_components_health():
+    """
+    Get health status for all component types
+    """
+    components_status = []
+    
+    for component in ComponentType:
+        # Simulate component health
+        health = np.random.uniform(75, 98)
+        
+        components_status.append({
+            'component': component.value,
+            'health_score': round(health, 1),
+            'status': 'GOOD' if health > 85 else 'DEGRADED',
+            'vehicles_affected': int((100 - health) * 2) if health < 85 else 0,
+            'next_maintenance': datetime.now().isoformat()
+        })
+    
+    return jsonify({
+        'success': True,
+        'data': components_status
+    })
+
 
 if __name__ == '__main__':
-    print("=" * 70)
-    print("🚊 API BACKEND - DIGITAL TWIN RATP DEV CASABLANCA")
-    print("=" * 70)
-    
-    # Charger les modèles existants
-    ml_models.load_models()
-    
-    print("\n✅ Serveur API démarré sur http://localhost:5001")
-    print("\n📊 Endpoints disponibles:")
-    print("   - GET  /api/status")
-    print("   - GET  /api/trams")
-    print("   - GET  /api/operations")
-    print("   - GET  /api/analytics")
-    print("   - GET  /api/maintenance/alerts")
-    print("   - GET  /api/stations")
-    print("   - POST /api/ml/train")
-    print("   - POST /api/ml/predict/delay")
-    print("   - POST /api/ml/predict/maintenance")
-    print("   - POST /api/report/generate")
-    print("=" * 70)
+    print("\n🚋 RATP Dev Casablanca - Predictive Maintenance API")
+    print("=" * 60)
+    print("Starting API server on http://localhost:5001")
+    print("\nAvailable endpoints:")
+    print("  GET  /api/health")
+    print("  GET  /api/fleet/summary")
+    print("  GET  /api/vehicle/<vehicle_id>/prediction")
+    print("  GET  /api/vehicle/<vehicle_id>/sensors")
+    print("  GET  /api/alerts")
+    print("  GET  /api/line/<line_id>/health")
+    print("  POST /api/maintenance/schedule")
+    print("  GET  /api/statistics/daily")
+    print("  GET  /api/components/health")
+    print("=" * 60)
     
     app.run(debug=True, host='0.0.0.0', port=5001)

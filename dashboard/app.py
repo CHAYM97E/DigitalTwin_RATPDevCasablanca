@@ -39,10 +39,17 @@ def get_db():
 # ROUTES PAGES
 # ============================================================================
 
+
+
 @app.route('/')
 def index():
-    """Page principale du dashboard"""
-    return render_template('index.html')
+    """Page principale avec index.html + GeoJSON"""
+    # lire le fichier GeoJSON
+    with open('templates/tram_Casablanca.geojson', 'r', encoding='utf-8') as f:
+        geojson_data = json.load(f)
+
+    # envoyer l’index.html avec le GeoJSON
+    return render_template('index.html', geojson=geojson_data)
 
 # ============================================================================
 # API ENDPOINTS
